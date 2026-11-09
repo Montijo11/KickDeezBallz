@@ -50,12 +50,43 @@
   .tile b { display:block; font-family:'Bebas Neue',sans-serif; font-size:30px; line-height:1; color:#fff; }
   .tile span { font-size:10px; letter-spacing:.12em; color:#9FB0C8; }
   .card { background:#16253B; border:1px solid rgba(255,255,255,.08); border-radius:16px; }
-  @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation:none !important; } .rise{opacity:1;transform:none;} }
+
+  /* ---------- Field ---------- */
+  .field { position:relative; width:100%; max-width:480px; margin:0 auto; aspect-ratio:400/380; }
+  .field svg { position:absolute; inset:0; width:100%; height:100%; }
+  .pos { position:absolute; transform:translate(-50%,-50%); z-index:5; }
+  .pos:hover, .pos.open { z-index:40; }
+  .spot { display:flex; flex-direction:column; align-items:center; cursor:default;
+    animation:spotpop .55s cubic-bezier(.2,1.5,.4,1) both; animation-delay:var(--d,0s); }
+  .pos.multi .spot { cursor:pointer; }
+  @keyframes spotpop { from{transform:scale(0);opacity:0} to{transform:scale(1);opacity:1} }
+  .dot { position:relative; width:34px; height:34px; border-radius:9999px; background:#101C2E; border:2px solid #E4440C;
+    display:flex; align-items:center; justify-content:center; font-family:'Bebas Neue',sans-serif; font-size:17px; line-height:1;
+    box-shadow:0 0 12px rgba(228,68,12,.7), 0 2px 6px rgba(0,0,0,.5); }
+  .pos.multi .dot { background:#E4440C; }
+  .pos:hover .dot, .pos.open .dot { transform:scale(1.12); }
+  .cnt { position:absolute; top:-7px; right:-7px; min-width:16px; height:16px; padding:0 3px; border-radius:9999px; background:#fff; color:#101C2E;
+    font:800 10px/16px 'Inter',sans-serif; text-align:center; }
+  .star { position:absolute; top:-9px; left:-6px; font-size:13px; color:#FFD34D; text-shadow:0 0 4px #000; }
+  .lbl { margin-top:2px; max-width:56px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    font:700 10px/1.1 'Inter',sans-serif; color:#fff; text-shadow:0 1px 3px #000, 0 0 4px #000; }
+  .pop { display:none; position:absolute; left:50%; bottom:100%; transform:translateX(-50%); padding-bottom:6px; }
+  .pos.below .pop { bottom:auto; top:100%; padding-bottom:0; padding-top:6px; }
+  .pos.l .pop { left:0; transform:none; }
+  .pos.r .pop { left:auto; right:0; transform:none; }
+  .pos:hover .pop, .pos.open .pop { display:block; }
+  .pop > div { min-width:170px; background:#0B1422; border:1px solid #E4440C; border-radius:12px; padding:8px 10px; box-shadow:0 8px 24px rgba(0,0,0,.6); }
+  .pop h4 { font-family:'Bebas Neue',sans-serif; font-size:18px; letter-spacing:.1em; color:#E4440C; margin-bottom:4px; }
+  .pop li { display:flex; gap:8px; align-items:center; font-size:13px; padding:3px 0; border-top:1px solid rgba(255,255,255,.08); white-space:nowrap; }
+  .pop li b { font-family:'Bebas Neue',sans-serif; font-size:18px; color:#E4440C; min-width:34px; }
+  @media (prefers-reduced-motion: reduce) {
+    *,*::before,*::after { animation:none !important; } .rise{opacity:1;transform:none;} .ball{display:none;}
+  }
 </style>
 </head>
 <body>
 
-<header class="fixed top-0 left-0 w-full h-16 bg-navy z-40 flex items-center justify-between px-4 border-b border-white/10">
+<header class="fixed top-0 left-0 w-full h-16 bg-navy z-50 flex items-center justify-between px-4 border-b border-white/10">
   <a href="#/" class="flex items-center" aria-label="KickDeezBallz Home">
     <img src="KDZ.jpeg" alt="KDZ logo" class="h-11 w-11 rounded-lg object-cover border border-orange/60" onerror="this.style.display='none'">
   </a>
@@ -64,8 +95,8 @@
   </button>
 </header>
 
-<div id="overlay" class="fixed inset-0 bg-black/60 z-40 hidden"></div>
-<nav id="drawer" class="fixed top-0 right-0 h-full w-72 bg-navy z-50 translate-x-full transition-transform duration-300 border-l border-orange/40 p-6">
+<div id="overlay" class="fixed inset-0 bg-black/60 z-[55] hidden"></div>
+<nav id="drawer" class="fixed top-0 right-0 h-full w-72 bg-navy z-[60] translate-x-full transition-transform duration-300 border-l border-orange/40 p-6">
   <button id="closeBtn" aria-label="Close menu" class="absolute top-4 right-4 text-3xl leading-none">&times;</button>
   <div class="font-display text-4xl mt-8 mb-8">KICK DEEZ <span class="text-orange">BALLZ</span></div>
   <a href="#/" class="navlink block py-3 font-display text-3xl border-b border-white/10">Home</a>
@@ -200,17 +231,96 @@ function startCountdown(target) {
 
 /* ---------- Roster ---------- */
 const POSITION_ORDER = ['1B', '2B', '3B', 'IF', 'LF', 'CF', 'RF', 'OF'];
+const POS_ALIAS = {
+  'PITCHER':'P', 'CATCHER':'C', 'SHORTSTOP':'SS', 'FIRST BASE':'1B', 'SECOND BASE':'2B', 'THIRD BASE':'3B',
+  'LEFT FIELD':'LF', 'CENTER FIELD':'CF', 'RIGHT FIELD':'RF', 'INFIELD':'IF', 'OUTFIELD':'OF'
+};
+const normPos = raw => { const u = String(raw || '').trim().toUpperCase(); return POS_ALIAS[u] || u; };
+
+// x, y on a 400 x 380 field
+const SPOTS = {
+  'P':[200,258], 'C':[200,352], '1B':[305,250], '2B':[245,208], 'SS':[155,208], '3B':[95,250], 'IF':[200,208],
+  'LF':[85,135], 'CF':[200,98], 'RF':[315,135], 'OF':[200,143], 'BENCH':[52,340]
+};
 
 function rosterRank(p) {
   if (String(p.status_tag || '').trim().toLowerCase() === 'captain') return 0;
-  const pos = String(p.preferred_position || '').trim().toUpperCase();
+  const pos = normPos(p.preferred_position);
   if (!pos) return 100;
   const i = POSITION_ORDER.indexOf(pos);
   return i === -1 ? 50 : 1 + i;
 }
 
+const isCaptain = p => String(p.status_tag || '').trim().toLowerCase() === 'captain';
+
+function fieldSVG() {
+  const base = (x, y) => `<rect x="${x - 6}" y="${y - 6}" width="12" height="12" fill="#fff" transform="rotate(45 ${x} ${y})"/>`;
+  return `
+  <svg viewBox="0 0 400 380" aria-hidden="true">
+    <defs>
+      <radialGradient id="grass" cx="50%" cy="86%" r="90%">
+        <stop offset="0" stop-color="#37a24a"/><stop offset="1" stop-color="#1b6a2c"/>
+      </radialGradient>
+      <pattern id="mow" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="20" height="40" fill="rgba(255,255,255,.045)"/>
+      </pattern>
+    </defs>
+    <rect width="400" height="380" rx="20" fill="#0d3a1d"/>
+    <path d="M200 325 L18 143 A258 258 0 0 1 382 143 Z" fill="url(#grass)"/>
+    <path d="M200 325 L18 143 A258 258 0 0 1 382 143 Z" fill="url(#mow)"/>
+    <path d="M200 325 L18 143 A258 258 0 0 1 382 143 Z" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2"/>
+    <polygon points="200,325 285,245 200,165 115,245" fill="#b9733a"/>
+    <polygon points="200,298 258,245 200,192 142,245" fill="#2a8a3c"/>
+    <circle cx="200" cy="258" r="13" fill="#b9733a"/>
+    <rect x="195" y="256" width="10" height="3" fill="#fff"/>
+    ${base(280,245)}${base(200,165)}${base(120,245)}
+    <polygon points="200,332 194,326 194,320 206,320 206,326" fill="#fff"/>
+    <circle class="ball" r="5" fill="#fff" stroke="#E4440C" stroke-width="2">
+      <animateMotion dur="7s" repeatCount="indefinite" path="M200 325 L280 245 L200 165 L120 245 Z"/>
+    </circle>
+  </svg>`;
+}
+
+function fieldHTML(players) {
+  const groups = {};
+  players.forEach(p => {
+    let k = normPos(p.preferred_position);
+    if (!SPOTS[k] || k === 'BENCH') k = 'BENCH';
+    (groups[k] = groups[k] || []).push(p);
+  });
+
+  let i = 0;
+  const spots = Object.keys(groups).map(k => {
+    const list = groups[k], [x, y] = SPOTS[k];
+    const multi = list.length > 1 || k === 'BENCH';
+    const cls = ['pos', multi ? 'multi' : '', y < 160 ? 'below' : '', x < 110 ? 'l' : '', x > 290 ? 'r' : ''].join(' ');
+    const d = (0.15 + i++ * 0.09).toFixed(2);
+    const cap = list.some(isCaptain) ? '<span class="star">&#9733;</span>' : '';
+    let inner;
+    if (multi) {
+      inner = `<div class="spot" style="--d:${d}s" tabindex="0" role="button" aria-label="${esc(k === 'BENCH' ? 'Bench' : k)}: ${list.length} players">
+        <div class="dot">${cap}<svg width="18" height="18" viewBox="0 0 24 24" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span class="cnt">${list.length}</span></div>
+        <div class="lbl">${esc(k === 'BENCH' ? 'BENCH' : k)}</div>
+      </div>
+      <div class="pop"><div><h4>${esc(k === 'BENCH' ? 'Bench / Other' : k)}</h4><ul>${list.map(p =>
+        `<li><b>#${esc(p.jersey_number)}</b><span>${esc(p.player_name)}${isCaptain(p) ? ' &#9733;' : ''}</span></li>`).join('')}</ul></div></div>`;
+    } else {
+      const p = list[0];
+      const first = String(p.player_name || '').trim().split(/\s+/)[0];
+      inner = `<div class="spot" style="--d:${d}s" title="${esc(p.player_name)} (${esc(k)})">
+        <div class="dot">${cap}${esc(p.jersey_number)}</div>
+        <div class="lbl">${esc(first)}</div>
+      </div>`;
+    }
+    return `<div class="${cls}" style="left:${(x / 4).toFixed(2)}%;top:${(y / 3.8).toFixed(2)}%">${inner}</div>`;
+  }).join('');
+
+  return `<div class="card p-3 mb-5"><div class="field" id="field">${fieldSVG()}${spots}</div>
+    <p class="text-center text-[11px] text-white/50 mt-2">Hover or tap a <span class="text-orange font-bold">&#9776;</span> spot to see everyone at that position</p></div>`;
+}
+
 async function renderRoster() {
-  app.innerHTML = `<div class="px-4 py-6"><h2 class="font-display text-5xl mb-4">THE <span class="text-orange">ROSTER</span></h2><div id="list" class="space-y-3 text-white/60">Loading...</div></div>`;
+  app.innerHTML = `<div class="px-4 py-6"><h2 class="font-display text-5xl mb-4">THE <span class="text-orange">ROSTER</span></h2><div id="fieldBox"></div><div id="list" class="space-y-3 text-white/60">Loading...</div></div>`;
   const { data, error } = await db.from('players').select('*');
   const list = document.getElementById('list');
   if (!list) return;
@@ -220,6 +330,15 @@ async function renderRoster() {
     (rosterRank(a) - rosterRank(b)) ||
     (Number(a.jersey_number) - Number(b.jersey_number)) ||
     String(a.jersey_number).localeCompare(String(b.jersey_number)));
+
+  const fb = document.getElementById('fieldBox');
+  fb.innerHTML = fieldHTML(data);
+  fb.addEventListener('click', e => {
+    const s = e.target.closest('.pos.multi');
+    fb.querySelectorAll('.pos.open').forEach(x => { if (x !== s) x.classList.remove('open'); });
+    if (s) s.classList.toggle('open');
+  });
+
   list.className = 'space-y-3';
   list.innerHTML = data.map(p => `
     <div class="card p-4 flex items-center gap-4">
