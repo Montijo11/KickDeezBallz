@@ -199,13 +199,27 @@ function startCountdown(target) {
 }
 
 /* ---------- Roster ---------- */
+const POSITION_ORDER = ['1B', '2B', '3B', 'IF', 'LF', 'CF', 'RF', 'OF'];
+
+function rosterRank(p) {
+  if (String(p.status_tag || '').trim().toLowerCase() === 'captain') return 0;
+  const pos = String(p.preferred_position || '').trim().toUpperCase();
+  if (!pos) return 100;
+  const i = POSITION_ORDER.indexOf(pos);
+  return i === -1 ? 50 : 1 + i;
+}
+
 async function renderRoster() {
   app.innerHTML = `<div class="px-4 py-6"><h2 class="font-display text-5xl mb-4">THE <span class="text-orange">ROSTER</span></h2><div id="list" class="space-y-3 text-white/60">Loading...</div></div>`;
-  const { data, error } = await db.from('players').select('*').order('jersey_number', { ascending: true });
+  const { data, error } = await db.from('players').select('*');
   const list = document.getElementById('list');
   if (!list) return;
   if (error) { list.textContent = 'Could not load roster: ' + error.message; return; }
   if (!data.length) { list.textContent = 'No players yet.'; return; }
+  data.sort((a, b) =>
+    (rosterRank(a) - rosterRank(b)) ||
+    (Number(a.jersey_number) - Number(b.jersey_number)) ||
+    String(a.jersey_number).localeCompare(String(b.jersey_number)));
   list.className = 'space-y-3';
   list.innerHTML = data.map(p => `
     <div class="card p-4 flex items-center gap-4">
