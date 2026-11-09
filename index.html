@@ -317,13 +317,14 @@ function startCountdown(target) {
 }
 
 /* ---------- Roster ---------- */
-const POSITION_ORDER = ['P', 'C', '1B', '2B', '3B', 'SS', 'IF', 'L', 'SL', 'LC', 'RC', 'SR', 'R', 'OF'];
+const POSITION_ORDER = ['P', 'C', '1B', '2B', '3B', 'SS', 'IF', 'L', 'SL', 'LC', 'RC', 'SR', 'R', 'OF', 'UT'];
 
 const POS_ALIAS = {
   'PITCHER':'P', 'CATCHER':'C', 'FIRST BASE':'1B', 'SECOND BASE':'2B', 'THIRD BASE':'3B', 'SHORTSTOP':'SS',
   'INFIELD':'IF', 'OUTFIELD':'OF',
   'LEFT FIELD':'L', 'LF':'L', 'SHORT LEFT':'SL', 'LEFT CENTER':'LC', 'LCF':'LC',
-  'RIGHT CENTER':'RC', 'RCF':'RC', 'SHORT RIGHT':'SR', 'RIGHT FIELD':'R', 'RF':'R'
+  'RIGHT CENTER':'RC', 'RCF':'RC', 'SHORT RIGHT':'SR', 'RIGHT FIELD':'R', 'RF':'R',
+  'UTILITY':'UT', 'UTIL':'UT', 'UTILITY PLAYER':'UT'
 };
 const normPos = raw => { const u = String(raw || '').trim().toUpperCase(); return POS_ALIAS[u] || u; };
 
@@ -334,7 +335,8 @@ const SPOTS = {
   'IF':[200,212],
   'SL':[155,172], 'SR':[245,172],
   'L':[58,140],   'LC':[148,100], 'RC':[252,100], 'R':[342,140],
-  'OF':[200,120]
+  'OF':[200,120],
+  'UT':[345,335]
 };
 
 // A player can have several positions, e.g. "R, RC" or "R/RC" or "R and RC" or "R RC"
@@ -410,13 +412,14 @@ function fieldHTML(players) {
     const cls = ['pos', multi ? 'multi' : '', y < 160 ? 'below' : '', x < 110 ? 'l' : '', x > 290 ? 'r' : ''].join(' ');
     const d = (0.15 + i++ * 0.09).toFixed(2);
     const cap = list.some(isCaptain) ? '<span class="star">&#9733;</span>' : '';
+    const title = k === 'UT' ? 'UT - Utility' : k;
     let inner;
     if (multi) {
-      inner = `<div class="spot" style="--d:${d}s" tabindex="0" role="button" aria-label="${esc(k)}: ${list.length} players">
+      inner = `<div class="spot" style="--d:${d}s" tabindex="0" role="button" aria-label="${esc(title)}: ${list.length} players">
         <div class="dot">${cap}<svg width="18" height="18" viewBox="0 0 24 24" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span class="cnt">${list.length}</span></div>
         <div class="lbl">${esc(k)}</div>
       </div>
-      <div class="pop"><div><h4>${esc(k)}</h4><ul>${list.map(p =>
+      <div class="pop"><div><h4>${esc(title)}</h4><ul>${list.map(p =>
         `<li><b>#${esc(p.jersey_number)}</b><span>${esc(p.player_name)}${isCaptain(p) ? ' &#9733;' : ''}</span></li>`).join('')}</ul></div></div>`;
     } else {
       const p = list[0];
@@ -430,7 +433,7 @@ function fieldHTML(players) {
   }).join('');
 
   return `<div class="card p-3 mb-5"><div class="field">${fieldSVG()}${empties}${spots}</div>
-    <p class="text-center text-[11px] text-white/50 mt-2">Hover or tap a <span class="text-orange font-bold">&#9776;</span> spot to see everyone at that position. Dashed circles are open positions.</p></div>`;
+    <p class="text-center text-[11px] text-white/50 mt-2">Hover or tap a <span class="text-orange font-bold">&#9776;</span> spot to see everyone at that position. UT is the utility spot for players who can play multiple positions. Dashed circles are open positions.</p></div>`;
 }
 
 async function renderRoster() {
