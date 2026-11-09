@@ -317,11 +317,10 @@ function startCountdown(target) {
 }
 
 /* ---------- Roster ---------- */
-const POSITION_ORDER = ['P', 'C', '1B', '2B', '3B', 'SS', 'IF', 'L', 'SL', 'LC', 'RC', 'SR', 'R', 'OF', 'UT'];
+const POSITION_ORDER = ['P', 'C', '1B', '2B', '3B', 'SS', 'L', 'SL', 'LC', 'RC', 'SR', 'R', 'UT'];
 
 const POS_ALIAS = {
   'PITCHER':'P', 'CATCHER':'C', 'FIRST BASE':'1B', 'SECOND BASE':'2B', 'THIRD BASE':'3B', 'SHORTSTOP':'SS',
-  'INFIELD':'IF', 'OUTFIELD':'OF',
   'LEFT FIELD':'L', 'LF':'L', 'SHORT LEFT':'SL', 'LEFT CENTER':'LC', 'LCF':'LC',
   'RIGHT CENTER':'RC', 'RCF':'RC', 'SHORT RIGHT':'SR', 'RIGHT FIELD':'R', 'RF':'R',
   'UTILITY':'UT', 'UTIL':'UT', 'UTILITY PLAYER':'UT'
@@ -332,10 +331,8 @@ const normPos = raw => { const u = String(raw || '').trim().toUpperCase(); retur
 const SPOTS = {
   'P':[200,258],  'C':[200,352],
   '1B':[305,250], '2B':[245,208], 'SS':[155,208], '3B':[95,250],
-  'IF':[200,212],
   'SL':[155,172], 'SR':[245,172],
   'L':[58,140],   'LC':[148,100], 'RC':[252,100], 'R':[342,140],
-  'OF':[200,120],
   'UT':[345,335]
 };
 
