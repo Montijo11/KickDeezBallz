@@ -157,6 +157,18 @@ const teamBlock = (t, fallback) => `
     <div class="text-sm font-extrabold text-orange tracking-wide">${t ? record(t) : '--'}</div>
   </div>`;
 
+/* ---------- Final score helpers ---------- */
+function resultInfo(game, home, away) {
+  const hs = game.home_score, aw = game.away_score;
+  if (hs === null || hs === undefined || aw === null || aw === undefined) return null;
+  const hn = esc(home?.team_name || 'TBD'), an = esc(away?.team_name || 'TBD');
+  let line;
+  if (hs > aw) line = `<span class="text-orange font-bold">W</span> ${hn} &nbsp; <span class="text-white/60 font-bold">L</span> ${an}`;
+  else if (hs < aw) line = `<span class="text-orange font-bold">W</span> ${an} &nbsp; <span class="text-white/60 font-bold">L</span> ${hn}`;
+  else line = `<span class="font-bold">Tie game</span>`;
+  return { hs, aw, line };
+}
+
 /* ---------- Seasons: tables "Season 1".."Season 7" and "Season 1 Teams".. ---------- */
 const SEASON_NUMS = [1, 2, 3, 4, 5, 6, 7];
 const gamesT = n => `Season ${n}`;
@@ -247,7 +259,16 @@ async function renderHome() {
     </details>
   </div></div>`;
 
-  if (g.match_at) startCountdown(new Date(g.match_at).getTime());
+  const res = resultInfo(g, g.home, g.away);
+  if (res) {
+    const cd = document.getElementById('cd');
+    cd.className = 'mt-5 text-center';
+    cd.innerHTML = `<div class="font-display text-5xl text-orange leading-none">${res.hs} - ${res.aw}</div>
+      <div class="text-xs font-bold tracking-widest text-white/70 mt-1">FINAL</div>
+      <div class="text-sm mt-1">${res.line}</div>`;
+  } else if (g.match_at) {
+    startCountdown(new Date(g.match_at).getTime());
+  }
 }
 
 function startCountdown(target) {
@@ -471,9 +492,15 @@ async function renderSchedule() {
     list.innerHTML = games.length ? games.map(game => {
       const l = mapLinks(game.field_name);
       const home = teams[game.home_team_id], away = teams[game.away_team_id];
+      const res = resultInfo(game, home, away);
       return `<div class="card p-4">
         <div class="text-xs text-orange font-bold tracking-widest">${esc(game.league_name)} &middot; Season ${n}${game.round_label ? ' &middot; ' + esc(game.round_label) : ''}</div>
         <div class="font-display text-2xl mt-1">${esc(home?.team_name || 'TBD')} <span class="text-orange">VS</span> ${esc(away?.team_name || 'TBD')}</div>
+        ${res ? `<div class="flex items-center justify-between mt-2">
+          <div class="font-display text-3xl text-orange leading-none">${res.hs} - ${res.aw}</div>
+          <div class="text-xs font-bold tracking-widest text-white/70">FINAL</div>
+        </div>
+        <div class="text-sm mt-1">${res.line}</div>` : ''}
         <div class="text-sm mt-1">${esc(fmtDate(game))}</div>
         <div class="text-sm text-white/70">${esc(game.field_name)}, ${esc(game.field_number)}</div>
         <div class="flex gap-3 mt-3 text-sm font-semibold">
