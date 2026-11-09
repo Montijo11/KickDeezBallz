@@ -142,9 +142,18 @@ const initials = t => {
   const w = t.team_name.trim().split(/\s+/);
   return (w.length === 1 ? w[0].slice(0, 3) : w.slice(0, 3).map(x => x[0]).join('')).toUpperCase();
 };
-const fmtDate = g => g.match_at
-  ? new Date(g.match_at).toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit', timeZone:'America/Los_Angeles' })
-  : g.match_time;
+
+/* Bye weeks and time ranges */
+const isBye = g => /bye/i.test(g.round_label || '');
+const fmtDate = g => {
+  if (!g.match_at) return g.match_time || '';
+  const d = new Date(g.match_at);
+  const day = d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', timeZone:'America/Los_Angeles' });
+  if (isBye(g)) return day;
+  const t = d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', timeZone:'America/Los_Angeles' });
+  const range = g.match_time && /[-\u2013]/.test(g.match_time) ? g.match_time : t;
+  return `${day}, ${range}`;
+};
 
 /* ---------- Field coordinates (exact map pins) ---------- */
 const FIELD_COORDS = {
@@ -471,7 +480,7 @@ async function defaultSeason() {
   return best ? best.season : 7;
 }
 
-/* ---------- Schedule ---------- */
+/* ---------- Schedule (newest game first, so Week 1 is at the bottom) ---------- */
 async function renderSchedule() {
   app.innerHTML = `
   <div class="px-4 py-6">
@@ -497,7 +506,7 @@ async function renderSchedule() {
     list.className = 'space-y-3 text-white/60';
     list.textContent = 'Loading...';
     const [g, teams] = await Promise.all([
-      db.from(gamesT(n)).select('*').order('match_at', { ascending: true }),
+      db.from(gamesT(n)).select('*').order('match_at', { ascending: false }),
       teamMapFor(n)
     ]);
     if (!document.getElementById('list')) return;
@@ -505,11 +514,19 @@ async function renderSchedule() {
     const games = g.data || [];
     list.className = 'space-y-3';
     list.innerHTML = games.length ? games.map(game => {
-      const l = mapLinks(game.field_name);
       const home = teams[game.home_team_id], away = teams[game.away_team_id];
+      const head = `<div class="text-xs text-orange font-bold tracking-widest">${esc(game.league_name)} &middot; Season ${n}${game.round_label ? ' &middot; ' + esc(game.round_label) : ''}</div>`;
+      if (isBye(game)) {
+        return `<div class="card p-4">
+          ${head}
+          <div class="font-display text-2xl mt-1">${home ? esc(home.team_name) + ' ' : ''}<span class="text-orange">BYE WEEK</span></div>
+          <div class="text-sm mt-1">${esc(fmtDate(game))}</div>
+        </div>`;
+      }
+      const l = mapLinks(game.field_name);
       const res = resultInfo(game, home, away);
       return `<div class="card p-4">
-        <div class="text-xs text-orange font-bold tracking-widest">${esc(game.league_name)} &middot; Season ${n}${game.round_label ? ' &middot; ' + esc(game.round_label) : ''}</div>
+        ${head}
         <div class="font-display text-2xl mt-1">${esc(home?.team_name || 'TBD')} <span class="text-orange">VS</span> ${esc(away?.team_name || 'TBD')}</div>
         ${res ? `<div class="flex items-center justify-between mt-2">
           <div class="font-display text-3xl text-orange leading-none">${res.hs} - ${res.aw}</div>
