@@ -248,9 +248,25 @@ const SPOTS = {
   'L':[58,140],   'LC':[148,100], 'RC':[252,100], 'R':[342,140]
 };
 
+// A player can have several positions, e.g. "R, RC" or "R/RC" or "R and RC" or "R RC"
+function parsePositions(raw) {
+  const out = [];
+  String(raw || '').split(/\s*(?:,|\/|\\|&|;|\||\+|-|\band\b)\s*/i).forEach(tok => {
+    const t = normPos(tok);
+    if (!t) return;
+    if (SPOTS[t]) { if (!out.includes(t)) out.push(t); return; }
+    tok.trim().split(/\s+/).forEach(w => {
+      const n = normPos(w);
+      if (SPOTS[n] && !out.includes(n)) out.push(n);
+    });
+  });
+  return out;
+}
+
 function rosterRank(p) {
   if (String(p.status_tag || '').trim().toLowerCase() === 'captain') return 0;
-  const i = POSITION_ORDER.indexOf(normPos(p.preferred_position));
+  const first = parsePositions(p.preferred_position)[0];
+  const i = POSITION_ORDER.indexOf(first);
   return i === -1 ? 100 : 1 + i;
 }
 
@@ -287,9 +303,9 @@ function fieldSVG() {
 function fieldHTML(players) {
   const groups = {}, unassigned = [];
   players.forEach(p => {
-    const k = normPos(p.preferred_position);
-    if (SPOTS[k]) (groups[k] = groups[k] || []).push(p);
-    else unassigned.push(p);
+    const ps = parsePositions(p.preferred_position);
+    if (!ps.length) { unassigned.push(p); return; }
+    ps.forEach(k => (groups[k] = groups[k] || []).push(p));
   });
 
   let i = 0;
@@ -310,7 +326,7 @@ function fieldHTML(players) {
     } else {
       const p = list[0];
       const first = String(p.player_name || '').trim().split(/\s+/)[0];
-      inner = `<div class="spot" style="--d:${d}s" title="${esc(p.player_name)} (${esc(k)})">
+      inner = `<div class="spot" style="--d:${d}s" title="${esc(p.player_name)} (${esc(parsePositions(p.preferred_position).join(', '))})">
         <div class="dot">${cap}${esc(p.jersey_number)}</div>
         <div class="lbl">${esc(first)}</div>
       </div>`;
