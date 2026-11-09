@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101C2E">
+<title>KickDeezBallz</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: { navy: '#101C2E', orange: '#E4440C' },
+    fontFamily: { display: ['Bebas Neue','sans-serif'], body: ['Inter','sans-serif'] }
+  }}};
+</script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { background:#101C2E; color:#fff; font-family:'Inter',sans-serif; overflow-x:hidden; }
+  .hero { position:relative; overflow:hidden; background:linear-gradient(180deg,#0B1422 0%,#101C2E 100%); }
+  .glow { position:absolute; left:50%; top:38%; width:460px; height:460px; margin:-230px 0 0 -230px;
+    background:radial-gradient(circle,rgba(228,68,12,.55),rgba(228,68,12,0) 65%); animation:pulse 4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:.6;transform:scale(1)} 50%{opacity:1;transform:scale(1.15)} }
+  .streak { position:absolute; left:0; height:3px; width:150px; opacity:0;
+    background:linear-gradient(90deg,transparent,#E4440C,transparent); animation:streak 3s linear infinite; }
+  @keyframes streak { 0%{transform:translateX(-200px) rotate(-20deg);opacity:0} 20%{opacity:.9} 100%{transform:translateX(560px) rotate(-20deg);opacity:0} }
+  .ball { animation:kick 3.4s ease-in-out infinite; filter:drop-shadow(0 0 18px rgba(228,68,12,.8)); }
+  @keyframes kick { 0%,100%{transform:translate(-70px,24px) rotate(0)} 50%{transform:translate(70px,-26px) rotate(360deg)} }
+  .spark { position:absolute; bottom:-10px; width:5px; height:5px; border-radius:50%; background:#E4440C; opacity:0; animation:spark 4s ease-in infinite; }
+  @keyframes spark { 0%{transform:translateY(0);opacity:0} 20%{opacity:1} 100%{transform:translateY(-320px);opacity:0} }
+  .neon { position:relative; border-radius:22px; padding:2px; overflow:hidden; box-shadow:0 0 34px rgba(228,68,12,.35); }
+  .neon::before { content:""; position:absolute; inset:-60%;
+    background:conic-gradient(from 0deg,#E4440C,transparent 30%,#fff 50%,transparent 70%,#E4440C); animation:spin 5s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .neon > .in { position:relative; background:#0B1422; border-radius:20px; }
+  .rise { opacity:0; transform:translateY(18px); animation:rise .7s ease forwards; }
+  @keyframes rise { to { opacity:1; transform:none; } }
+  .badge { width:72px; height:72px; margin:0 auto; border-radius:9999px; border:2px solid #E4440C;
+    background:#101C2E; display:flex; align-items:center; justify-content:center;
+    font-family:'Bebas Neue',sans-serif; font-size:26px; letter-spacing:1px; box-shadow:0 0 16px rgba(228,68,12,.45); }
+  .vs { font-family:'Bebas Neue',sans-serif; font-size:44px; color:#E4440C; text-shadow:0 0 16px rgba(228,68,12,.9); animation:pulse 2s ease-in-out infinite; }
+  .tile { background:#101C2E; border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:8px 0; text-align:center; }
+  .tile b { display:block; font-family:'Bebas Neue',sans-serif; font-size:30px; line-height:1; color:#fff; }
+  .tile span { font-size:10px; letter-spacing:.12em; color:#9FB0C8; }
+  .card { background:#16253B; border:1px solid rgba(255,255,255,.08); border-radius:16px; }
+  @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation:none !important; } .rise{opacity:1;transform:none;} }
+</style>
+</head>
+<body>
+
+<header class="fixed top-0 left-0 w-full h-16 bg-navy z-40 flex items-center justify-between px-4 border-b border-white/10">
+  <a href="#/" class="flex items-center" aria-label="Home">
+    <span class="font-display text-3xl tracking-wide leading-none">K<span class="text-orange">D</span>Z</span>
+  </a>
+  <button id="menuBtn" aria-label="Open menu" class="p-2">
+    <svg width="28" height="28" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M4 8h20M4 14h20M4 20h20"/></svg>
+  </button>
+</header>
+
+<div id="overlay" class="fixed inset-0 bg-black/60 z-40 hidden"></div>
+<nav id="drawer" class="fixed top-0 right-0 h-full w-72 bg-navy z-50 translate-x-full transition-transform duration-300 border-l border-orange/40 p-6">
+  <button id="closeBtn" aria-label="Close menu" class="absolute top-4 right-4 text-3xl leading-none">&times;</button>
+  <div class="font-display text-4xl mt-8 mb-8">KICK DEEZ <span class="text-orange">BALLZ</span></div>
+  <a href="#/" class="navlink block py-3 font-display text-3xl border-b border-white/10">Home</a>
+  <a href="#/schedule" class="navlink block py-3 font-display text-3xl border-b border-white/10">Schedule</a>
+  <a href="#/roster" class="navlink block py-3 font-display text-3xl border-b border-white/10">Roster</a>
+</nav>
+
+<main id="app" class="pt-16 min-h-screen"></main>
+<footer class="text-center text-xs text-white/40 py-8">&copy; KickDeezBallz.com</footer>
+
+<script>
+const db = supabase.createClient(KDB_CONFIG.SUPABASE_URL, KDB_CONFIG.SUPABASE_ANON_KEY);
+const app = document.getElementById('app');
+let timer = null;
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const record = t => t ? `${t.wins}-${t.losses}${t.ties ? '-' + t.ties : ''}` : '0-0';
+const initials = t => {
+  if (!t) return 'TBD';
+  if (t.is_our_team) return 'KDZ';
+  const w = t.team_name.trim().split(/\s+/);
+  return (w.length === 1 ? w[0].slice(0, 3) : w.slice(0, 3).map(x => x[0]).join('')).toUpperCase();
+};
+const fmtDate = g => g.match_at
+  ? new Date(g.match_at).toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit', timeZone:'America/Los_Angeles' })
+  : g.match_time;
+const mapLinks = field => {
+  const q = encodeURIComponent(field);
+  return { google: `https://www.google.com/maps/search/?api=1&query=${q}`, apple: `https://maps.apple.com/?q=${q}` };
+};
+const isApple = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+
+const teamBlock = (t, fallback) => `
+  <div class="flex-1 text-center">
+    <div class="badge">${esc(initials(t))}</div>
+    <div class="font-display text-2xl leading-tight mt-2">${esc(t ? t.team_name : fallback)}</div>
+    <div class="text-sm font-extrabold text-orange tracking-wide">${t ? record(t) : '--'}</div>
+  </div>`;
+
+/* ---------- Drawer ---------- */
+const drawer = document.getElementById('drawer'), overlay = document.getElementById('overlay');
+const openMenu = () => { drawer.classList.remove('translate-x-full'); overlay.classList.remove('hidden'); };
+const closeMenu = () => { drawer.classList.add('translate-x-full'); overlay.classList.add('hidden'); };
+document.getElementById('menuBtn').onclick = openMenu;
+document.getElementById('closeBtn').onclick = closeMenu;
+overlay.onclick = closeMenu;
+document.querySelectorAll('.navlink').forEach(a => a.addEventListener('click', closeMenu));
+
+/* ---------- Home ---------- */
+async function renderHome() {
+  const sparks = Array.from({length: 10}, (_, i) =>
+    `<span class="spark" style="left:${8 + i * 9}%;animation-delay:${(i * 0.45).toFixed(2)}s"></span>`).join('');
+  const streaks = [18, 34, 52, 70].map((t, i) =>
+    `<span class="streak" style="top:${t}%;animation-delay:${i * 0.7}s"></span>`).join('');
+
+  app.innerHTML = `
+  <section class="hero px-5 pt-10 pb-14 text-center">
+    <div class="glow"></div>${streaks}${sparks}
+    <div class="relative">
+      <div class="flex justify-center h-28 items-center">
+        <svg class="ball" width="96" height="96" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="46" fill="#E4440C"/>
+          <circle cx="50" cy="50" r="46" fill="none" stroke="#fff" stroke-width="3" opacity=".9"/>
+          <path d="M14 36 Q50 52 86 36 M14 64 Q50 48 86 64 M50 4 V96" stroke="#fff" stroke-width="3" fill="none" opacity=".85"/>
+        </svg>
+      </div>
+      <h1 class="font-display text-7xl leading-none rise" style="animation-delay:.1s">KICK DEEZ<br><span class="text-orange" style="text-shadow:0 0 28px rgba(228,68,12,.8)">BALLZ</span></h1>
+      <p class="mt-3 tracking-[.3em] text-xs text-white/70 rise" style="animation-delay:.3s">THURSDAY NIGHT FLIGHT</p>
+    </div>
+  </section>
+  <section id="nextGame" class="px-4 -mt-6 pb-6 relative">
+    <div class="text-center text-white/60 py-8">Loading next game...</div>
+  </section>`;
+
+  const { data, error } = await db.from('tournaments')
+    .select('*, home:teams!home_team_id(*), away:teams!away_team_id(*)')
+    .eq('is_active', true).order('match_at', { ascending: true }).limit(1);
+
+  const box = document.getElementById('nextGame');
+  if (!box) return;
+  if (error) { box.innerHTML = `<div class="card p-5 text-center text-sm">Could not load the next game.<br><span class="text-white/50">${esc(error.message)}</span></div>`; return; }
+  if (!data || !data.length) { box.innerHTML = `<div class="card p-6 text-center font-display text-2xl">No game scheduled yet</div>`; return; }
+
+  const g = data[0], links = mapLinks(g.field_name);
+  const main = isApple ? links.apple : links.google;
+  box.innerHTML = `
+  <div class="neon rise" style="animation-delay:.5s"><div class="in p-5">
+    <div class="flex items-center justify-between mb-4">
+      <span class="font-display text-2xl tracking-widest text-orange">NEXT GAME</span>
+      <span class="text-[11px] text-white/60 text-right">${esc(g.league_name)}</span>
+    </div>
+    <div class="flex items-start">
+      ${teamBlock(g.home, 'TBD')}
+      <div class="vs pt-3 px-1">VS</div>
+      ${teamBlock(g.away, 'TBD')}
+    </div>
+    <div class="text-center mt-5">
+      <div class="font-display text-3xl">${esc(fmtDate(g))}</div>
+      <div class="text-sm text-white/80 mt-1">${esc(g.field_name)}, ${esc(g.field_number)}</div>
+      <div class="text-xs text-orange font-semibold mt-1">Arrive ${esc(g.arrival_buffer)}</div>
+    </div>
+    <div id="cd" class="grid grid-cols-4 gap-2 mt-5"></div>
+    <div class="grid grid-cols-2 gap-3 mt-5">
+      <a href="${main}" target="_blank" rel="noopener" class="bg-orange text-white text-center font-display text-2xl py-3 rounded-xl shadow-lg active:scale-95 transition">Get Directions</a>
+      <a href="#/schedule" class="border-2 border-white text-white text-center font-display text-2xl py-3 rounded-xl active:scale-95 transition">Full Schedule</a>
+    </div>
+    <details class="mt-4 text-sm">
+      <summary class="cursor-pointer text-orange font-semibold">Parking tips</summary>
+      <p class="mt-2 text-white/80 leading-relaxed">${esc(g.parking_tips)}</p>
+    </details>
+  </div></div>`;
+
+  if (g.match_at) startCountdown(new Date(g.match_at).getTime());
+}
+
+function startCountdown(target) {
+  const el = document.getElementById('cd');
+  const tile = (n, l) => `<div class="tile"><b>${String(n).padStart(2, '0')}</b><span>${l}</span></div>`;
+  const tick = () => {
+    const diff = target - Date.now();
+    if (!document.getElementById('cd')) return clearInterval(timer);
+    if (diff <= 0) {
+      el.className = 'mt-5';
+      el.innerHTML = `<div class="font-display text-4xl text-center text-orange">GAME TIME!</div>`;
+      return clearInterval(timer);
+    }
+    const d = Math.floor(diff / 864e5), h = Math.floor(diff % 864e5 / 36e5),
+          m = Math.floor(diff % 36e5 / 6e4), s = Math.floor(diff % 6e4 / 1e3);
+    const same = new Date(target).toDateString() === new Date().toDateString();
+    el.innerHTML = same
+      ? `<div class="col-span-4 text-center font-display text-3xl text-orange mb-1">GAME DAY!</div>` + tile(h,'HRS') + tile(m,'MIN') + tile(s,'SEC') + tile(d,'DAYS')
+      : tile(d,'DAYS') + tile(h,'HRS') + tile(m,'MIN') + tile(s,'SEC');
+  };
+  tick(); timer = setInterval(tick, 1000);
+}
+
+/* ---------- Roster ---------- */
+async function renderRoster() {
+  app.innerHTML = `<div class="px-4 py-6"><h2 class="font-display text-5xl mb-4">THE <span class="text-orange">ROSTER</span></h2><div id="list" class="space-y-3 text-white/60">Loading...</div></div>`;
+  const { data, error } = await db.from('players').select('*').order('jersey_number', { ascending: true });
+  const list = document.getElementById('list');
+  if (!list) return;
+  if (error) { list.textContent = 'Could not load roster: ' + error.message; return; }
+  if (!data.length) { list.textContent = 'No players yet.'; return; }
+  list.className = 'space-y-3';
+  list.innerHTML = data.map(p => `
+    <div class="card p-4 flex items-center gap-4">
+      <div class="shrink-0 w-16 h-16 rounded-full border-2 border-orange bg-navy flex items-center justify-center">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="#9FB0C8"><circle cx="12" cy="8" r="4.5"/><path d="M3 22c0-5 4-8 9-8s9 3 9 8z"/></svg>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="font-display text-2xl leading-tight truncate">${esc(p.player_name)}</div>
+        <div class="text-sm text-white/70">${esc(p.preferred_position)}</div>
+        <span class="inline-block mt-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange/20 text-orange border border-orange/40">${esc(p.status_tag)}</span>
+      </div>
+      <div class="font-display text-4xl text-orange">#${esc(p.jersey_number)}</div>
+    </div>`).join('');
+}
+
+/* ---------- Schedule ---------- */
+async function renderSchedule() {
+  app.innerHTML = `
+  <div class="px-4 py-6">
+    <h2 class="font-display text-5xl mb-4">THE <span class="text-orange">SCHEDULE</span></h2>
+    <div class="grid grid-cols-2 gap-2 mb-4">
+      <button id="tabA" class="py-2 rounded-lg font-display text-2xl bg-orange">Active</button>
+      <button id="tabP" class="py-2 rounded-lg font-display text-2xl bg-white/10">Past</button>
+    </div>
+    <div id="list" class="space-y-3 text-white/60">Loading...</div>
+  </div>`;
+  const { data, error } = await db.from('tournaments')
+    .select('*, home:teams!home_team_id(*), away:teams!away_team_id(*)')
+    .order('match_at', { ascending: true });
+  const list = document.getElementById('list');
+  if (!list) return;
+  if (error) { list.textContent = 'Could not load schedule: ' + error.message; return; }
+
+  const show = active => {
+    document.getElementById('tabA').className = 'py-2 rounded-lg font-display text-2xl ' + (active ? 'bg-orange' : 'bg-white/10');
+    document.getElementById('tabP').className = 'py-2 rounded-lg font-display text-2xl ' + (active ? 'bg-white/10' : 'bg-orange');
+    const rows = data.filter(g => g.is_active === active);
+    list.className = 'space-y-3';
+    list.innerHTML = rows.length ? rows.map(g => {
+      const l = mapLinks(g.field_name);
+      return `<div class="card p-4">
+        <div class="text-xs text-orange font-bold tracking-widest">${esc(g.league_name)} &middot; ${esc(g.division_name)}</div>
+        <div class="font-display text-2xl mt-1">${g.home || g.away ? esc(g.home?.team_name || 'TBD') + ' <span class="text-orange">VS</span> ' + esc(g.away?.team_name || 'TBD') : esc(g.division_name)}</div>
+        <div class="text-sm mt-1">${esc(fmtDate(g))}</div>
+        <div class="text-sm text-white/70">${esc(g.field_name)}, ${esc(g.field_number)}</div>
+        <div class="flex gap-3 mt-3 text-sm font-semibold">
+          <a class="text-orange underline" target="_blank" rel="noopener" href="${l.google}">Google Maps</a>
+          <a class="text-orange underline" target="_blank" rel="noopener" href="${l.apple}">Apple Maps</a>
+        </div>
+      </div>`;
+    }).join('') : '<div class="text-white/60">Nothing here yet.</div>';
+  };
+  document.getElementById('tabA').onclick = () => show(true);
+  document.getElementById('tabP').onclick = () => show(false);
+  show(true);
+}
+
+/* ---------- Router ---------- */
+function route() {
+  clearInterval(timer);
+  window.scrollTo(0, 0);
+  const h = location.hash || '#/';
+  if (h === '#/roster') renderRoster();
+  else if (h === '#/schedule') renderSchedule();
+  else renderHome();
+}
+window.addEventListener('hashchange', route);
+route();
+</script>
+</body>
+</html>z
