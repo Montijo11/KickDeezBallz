@@ -43,6 +43,9 @@
     background:#101C2E; display:flex; align-items:center; justify-content:center;
     font-family:'Bebas Neue',sans-serif; font-size:26px; letter-spacing:1px; box-shadow:0 0 16px rgba(228,68,12,.45); }
   .vs { font-family:'Bebas Neue',sans-serif; font-size:44px; color:#E4440C; text-shadow:0 0 16px rgba(228,68,12,.9); animation:pulse 2s ease-in-out infinite; }
+  .round { display:inline-block; font-family:'Bebas Neue',sans-serif; font-size:40px; line-height:1; letter-spacing:.12em; color:#fff;
+    background:rgba(228,68,12,.25); border:2px solid #E4440C; border-radius:9999px; padding:8px 28px;
+    box-shadow:0 0 22px rgba(228,68,12,.55); text-shadow:0 0 12px rgba(228,68,12,.8); white-space:nowrap; }
   .tile { background:#101C2E; border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:8px 0; text-align:center; }
   .tile b { display:block; font-family:'Bebas Neue',sans-serif; font-size:30px; line-height:1; color:#fff; }
   .tile span { font-size:10px; letter-spacing:.12em; color:#9FB0C8; }
@@ -124,7 +127,6 @@ async function renderHome() {
     <div class="relative">
       <h1 class="sr-only">KickDeezBallz</h1>
       <img src="KickDeezBallz_Logo_Transparent.png" alt="KickDeezBallz logo" class="mainlogo w-full max-w-md mx-auto" onerror="this.style.display='none'">
-      <p class="mt-3 tracking-[.3em] text-xs text-white/70 rise" style="animation-delay:.3s">THURSDAY NIGHT FLIGHT</p>
     </div>
   </section>
   <section id="nextGame" class="px-4 -mt-6 pb-6 relative">
@@ -148,10 +150,10 @@ async function renderHome() {
       <span class="font-display text-2xl tracking-widest text-orange">NEXT GAME</span>
       <span class="text-[11px] text-white/60 text-right">${esc(g.league_name)}</span>
     </div>
+    ${g.round_label ? `<div class="text-center mb-4"><span class="round">${esc(g.round_label)}</span></div>` : ''}
     <div class="flex items-start">
       ${teamBlock(g.home, 'TBD')}
-      <div class="px-1 pt-1 text-center">
-        ${g.round_label ? `<div class="font-display text-base tracking-widest text-white bg-orange/20 border border-orange/60 rounded-full px-3 py-0.5 mb-1 whitespace-nowrap">${esc(g.round_label)}</div>` : ''}
+      <div class="px-1 pt-3 text-center">
         <div class="vs">VS</div>
       </div>
       ${teamBlock(g.away, 'TBD')}
@@ -245,8 +247,8 @@ async function renderSchedule() {
     list.innerHTML = rows.length ? rows.map(g => {
       const l = mapLinks(g.field_name);
       return `<div class="card p-4">
-        <div class="text-xs text-orange font-bold tracking-widest">${esc(g.league_name)} &middot; ${esc(g.division_name)}</div>
-        <div class="font-display text-2xl mt-1">${g.home || g.away ? esc(g.home?.team_name || 'TBD') + ' <span class="text-orange">VS</span> ' + esc(g.away?.team_name || 'TBD') : esc(g.division_name)}</div>
+        <div class="text-xs text-orange font-bold tracking-widest">${esc(g.league_name)}${g.round_label ? ' &middot; ' + esc(g.round_label) : ''}</div>
+        <div class="font-display text-2xl mt-1">${esc(g.home?.team_name || 'TBD')} <span class="text-orange">VS</span> ${esc(g.away?.team_name || 'TBD')}</div>
         <div class="text-sm mt-1">${esc(fmtDate(g))}</div>
         <div class="text-sm text-white/70">${esc(g.field_name)}, ${esc(g.field_number)}</div>
         <div class="flex gap-3 mt-3 text-sm font-semibold">
