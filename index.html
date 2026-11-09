@@ -118,11 +118,12 @@
 <div id="overlay" class="fixed inset-0 bg-black/60 z-[55] hidden"></div>
 <nav id="drawer" class="fixed top-0 right-0 h-full w-72 bg-navy z-[60] translate-x-full transition-transform duration-300 border-l border-orange/40 p-6">
   <button id="closeBtn" aria-label="Close menu" class="absolute top-4 right-4 text-3xl leading-none">&times;</button>
-  <div class="font-display text-4xl mt-8 mb-8">KICK DEEZ <span class="text-orange">BALLZ</span></div>
+  <div class="font-display text-4xl mt-8 mb-8">KICK <span class="text-orange">DEEZ</span> BALLZ</div>
   <a href="#/" class="navlink block py-3 font-display text-3xl border-b border-white/10">Home</a>
   <a href="#/schedule" class="navlink block py-3 font-display text-3xl border-b border-white/10">Schedule</a>
   <a href="#/standings" class="navlink block py-3 font-display text-3xl border-b border-white/10">Standings</a>
   <a href="#/roster" class="navlink block py-3 font-display text-3xl border-b border-white/10">Roster</a>
+  <a href="#/achievements" class="navlink block py-3 font-display text-3xl border-b border-white/10">Achievements</a>
 </nav>
 
 <main id="app" class="pt-16 min-h-screen"></main>
@@ -144,8 +145,22 @@ const initials = t => {
 const fmtDate = g => g.match_at
   ? new Date(g.match_at).toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit', timeZone:'America/Los_Angeles' })
   : g.match_time;
+
+/* ---------- Field coordinates (exact map pins) ---------- */
+const FIELD_COORDS = {
+  'morley field sports complex': [32.73774798852176, -117.13807689220057]
+};
 const mapLinks = field => {
-  const q = encodeURIComponent(field);
+  const name = String(field || '');
+  const c = FIELD_COORDS[name.trim().toLowerCase()];
+  if (c) {
+    const ll = `${c[0]},${c[1]}`;
+    return {
+      google: `https://www.google.com/maps/search/?api=1&query=${ll}`,
+      apple: `https://maps.apple.com/?ll=${ll}&q=${encodeURIComponent(name)}`
+    };
+  }
+  const q = encodeURIComponent(name);
   return { google: `https://www.google.com/maps/search/?api=1&query=${q}`, apple: `https://maps.apple.com/?q=${q}` };
 };
 const isApple = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
@@ -572,6 +587,39 @@ async function renderStandings() {
   load(season);
 }
 
+/* ---------- Achievements ---------- */
+async function renderAchievements() {
+  app.innerHTML = `
+  <div class="px-4 py-6">
+    <h2 class="font-display text-5xl mb-4">THE <span class="text-orange">ACHIEVEMENTS</span></h2>
+    <div id="list" class="space-y-3 text-white/60">Loading...</div>
+  </div>`;
+  const list = document.getElementById('list');
+  const { data, error } = await db.from('achievements').select('*');
+  if (!document.getElementById('list')) return;
+  if (error) { list.textContent = 'Could not load achievements: ' + error.message; return; }
+  const rows = (data || []).slice().sort((a, b) => {
+    const da = a.earned_on ? new Date(a.earned_on).getTime() : -Infinity;
+    const dbb = b.earned_on ? new Date(b.earned_on).getTime() : -Infinity;
+    return (dbb - da) || ((a.sort_order || 0) - (b.sort_order || 0));
+  });
+  list.className = 'space-y-3';
+  list.innerHTML = rows.length ? rows.map(a => {
+    const when = a.earned_on
+      ? new Date(a.earned_on + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+      : '';
+    const meta = [a.season_name, when].filter(Boolean).map(esc).join(' &middot; ');
+    return `<div class="card p-4 flex items-center gap-4">
+      <div class="shrink-0 w-16 h-16 rounded-full border-2 border-orange bg-navy flex items-center justify-center text-3xl">${esc(a.icon || '🏆')}</div>
+      <div class="flex-1 min-w-0">
+        ${meta ? `<div class="text-xs text-orange font-bold tracking-widest">${meta}</div>` : ''}
+        <div class="font-display text-2xl leading-tight">${esc(a.title)}</div>
+        ${a.description ? `<div class="text-sm text-white/70 mt-1">${esc(a.description)}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('') : '<div class="text-white/60">No achievements yet.</div>';
+}
+
 /* ---------- Router ---------- */
 function route() {
   clearInterval(timer);
@@ -580,6 +628,7 @@ function route() {
   if (h === '#/roster') renderRoster();
   else if (h === '#/schedule') renderSchedule();
   else if (h === '#/standings') renderStandings();
+  else if (h === '#/achievements') renderAchievements();
   else renderHome();
 }
 window.addEventListener('hashchange', route);
