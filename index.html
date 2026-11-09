@@ -230,25 +230,28 @@ function startCountdown(target) {
 }
 
 /* ---------- Roster ---------- */
-const POSITION_ORDER = ['1B', '2B', '3B', 'IF', 'LF', 'CF', 'RF', 'OF'];
+// Kickball positions, in roster sort order (after the Captain)
+const POSITION_ORDER = ['P', 'C', '1B', '2B', '3B', 'SS', 'L', 'SL', 'LC', 'RC', 'SR', 'R'];
+
 const POS_ALIAS = {
-  'PITCHER':'P', 'CATCHER':'C', 'SHORTSTOP':'SS', 'FIRST BASE':'1B', 'SECOND BASE':'2B', 'THIRD BASE':'3B',
-  'LEFT FIELD':'LF', 'CENTER FIELD':'CF', 'RIGHT FIELD':'RF', 'INFIELD':'IF', 'OUTFIELD':'OF'
+  'PITCHER':'P', 'CATCHER':'C', 'FIRST BASE':'1B', 'SECOND BASE':'2B', 'THIRD BASE':'3B', 'SHORTSTOP':'SS',
+  'LEFT FIELD':'L', 'LF':'L', 'SHORT LEFT':'SL', 'LEFT CENTER':'LC', 'LCF':'LC',
+  'RIGHT CENTER':'RC', 'RCF':'RC', 'SHORT RIGHT':'SR', 'RIGHT FIELD':'R', 'RF':'R'
 };
 const normPos = raw => { const u = String(raw || '').trim().toUpperCase(); return POS_ALIAS[u] || u; };
 
 // x, y on a 400 x 380 field
 const SPOTS = {
-  'P':[200,258], 'C':[200,352], '1B':[305,250], '2B':[245,208], 'SS':[155,208], '3B':[95,250], 'IF':[200,208],
-  'LF':[85,135], 'CF':[200,98], 'RF':[315,135], 'OF':[200,143], 'BENCH':[52,340]
+  'P':[200,258],  'C':[200,352],
+  '1B':[305,250], '2B':[245,208], 'SS':[155,208], '3B':[95,250],
+  'SL':[88,192],  'SR':[312,192],
+  'L':[58,140],   'LC':[148,100], 'RC':[252,100], 'R':[342,140]
 };
 
 function rosterRank(p) {
   if (String(p.status_tag || '').trim().toLowerCase() === 'captain') return 0;
-  const pos = normPos(p.preferred_position);
-  if (!pos) return 100;
-  const i = POSITION_ORDER.indexOf(pos);
-  return i === -1 ? 50 : 1 + i;
+  const i = POSITION_ORDER.indexOf(normPos(p.preferred_position));
+  return i === -1 ? 100 : 1 + i;
 }
 
 const isCaptain = p => String(p.status_tag || '').trim().toLowerCase() === 'captain';
@@ -282,27 +285,27 @@ function fieldSVG() {
 }
 
 function fieldHTML(players) {
-  const groups = {};
+  const groups = {}, unassigned = [];
   players.forEach(p => {
-    let k = normPos(p.preferred_position);
-    if (!SPOTS[k] || k === 'BENCH') k = 'BENCH';
-    (groups[k] = groups[k] || []).push(p);
+    const k = normPos(p.preferred_position);
+    if (SPOTS[k]) (groups[k] = groups[k] || []).push(p);
+    else unassigned.push(p);
   });
 
   let i = 0;
   const spots = Object.keys(groups).map(k => {
     const list = groups[k], [x, y] = SPOTS[k];
-    const multi = list.length > 1 || k === 'BENCH';
+    const multi = list.length > 1;
     const cls = ['pos', multi ? 'multi' : '', y < 160 ? 'below' : '', x < 110 ? 'l' : '', x > 290 ? 'r' : ''].join(' ');
     const d = (0.15 + i++ * 0.09).toFixed(2);
     const cap = list.some(isCaptain) ? '<span class="star">&#9733;</span>' : '';
     let inner;
     if (multi) {
-      inner = `<div class="spot" style="--d:${d}s" tabindex="0" role="button" aria-label="${esc(k === 'BENCH' ? 'Bench' : k)}: ${list.length} players">
+      inner = `<div class="spot" style="--d:${d}s" tabindex="0" role="button" aria-label="${esc(k)}: ${list.length} players">
         <div class="dot">${cap}<svg width="18" height="18" viewBox="0 0 24 24" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span class="cnt">${list.length}</span></div>
-        <div class="lbl">${esc(k === 'BENCH' ? 'BENCH' : k)}</div>
+        <div class="lbl">${esc(k)}</div>
       </div>
-      <div class="pop"><div><h4>${esc(k === 'BENCH' ? 'Bench / Other' : k)}</h4><ul>${list.map(p =>
+      <div class="pop"><div><h4>${esc(k)}</h4><ul>${list.map(p =>
         `<li><b>#${esc(p.jersey_number)}</b><span>${esc(p.player_name)}${isCaptain(p) ? ' &#9733;' : ''}</span></li>`).join('')}</ul></div></div>`;
     } else {
       const p = list[0];
@@ -315,8 +318,12 @@ function fieldHTML(players) {
     return `<div class="${cls}" style="left:${(x / 4).toFixed(2)}%;top:${(y / 3.8).toFixed(2)}%">${inner}</div>`;
   }).join('');
 
-  return `<div class="card p-3 mb-5"><div class="field" id="field">${fieldSVG()}${spots}</div>
-    <p class="text-center text-[11px] text-white/50 mt-2">Hover or tap a <span class="text-orange font-bold">&#9776;</span> spot to see everyone at that position</p></div>`;
+  const note = unassigned.length
+    ? `<p class="text-center text-[11px] text-red-300 mt-2">No valid position set: ${unassigned.map(p => esc(p.player_name)).join(', ')}</p>`
+    : '';
+
+  return `<div class="card p-3 mb-5"><div class="field">${fieldSVG()}${spots}</div>
+    <p class="text-center text-[11px] text-white/50 mt-2">Hover or tap a <span class="text-orange font-bold">&#9776;</span> spot to see everyone at that position</p>${note}</div>`;
 }
 
 async function renderRoster() {
