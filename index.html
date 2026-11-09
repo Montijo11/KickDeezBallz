@@ -136,6 +136,28 @@ const teamBlock = (t, fallback) => `
     <div class="text-sm font-extrabold text-orange tracking-wide">${t ? record(t) : '--'}</div>
   </div>`;
 
+/* ---------- Seasons: tables "Season 1".."Season 7" and "Season 1 Teams".. ---------- */
+const SEASON_NUMS = [1, 2, 3, 4, 5, 6, 7];
+const gamesT = n => `Season ${n}`;
+const teamsT = n => `Season ${n} Teams`;
+
+async function teamMapFor(n) {
+  const { data } = await db.from(teamsT(n)).select('*');
+  return Object.fromEntries((data || []).map(t => [t.id, t]));
+}
+
+async function findActiveGame() {
+  const res = await Promise.all(SEASON_NUMS.map(async n => {
+    const r = await db.from(gamesT(n)).select('*').eq('is_active', true)
+      .order('match_at', { ascending: true }).limit(1);
+    return { n, data: r.data, error: r.error };
+  }));
+  const found = res.filter(r => r.data && r.data.length).map(r => ({ season: r.n, game: r.data[0] }));
+  found.sort((a, b) => new Date(a.game.match_at || 0) - new Date(b.game.match_at || 0));
+  const allFailed = res.every(r => r.error);
+  return { best: found[0] || null, error: allFailed ? res[0].error : null };
+}
+
 /* ---------- Drawer ---------- */
 const drawer = document.getElementById('drawer'), overlay = document.getElementById('overlay');
 const openMenu = () => { drawer.classList.remove('translate-x-full'); overlay.classList.remove('hidden'); };
@@ -164,22 +186,21 @@ async function renderHome() {
     <div class="text-center text-white/60 py-8">Loading next game...</div>
   </section>`;
 
-  const { data, error } = await db.from('tournaments')
-    .select('*, home:teams!home_team_id(*), away:teams!away_team_id(*)')
-    .eq('is_active', true).order('match_at', { ascending: true }).limit(1);
-
+  const { best, error } = await findActiveGame();
   const box = document.getElementById('nextGame');
   if (!box) return;
   if (error) { box.innerHTML = `<div class="card p-5 text-center text-sm">Could not load the next game.<br><span class="text-white/50">${esc(error.message)}</span></div>`; return; }
-  if (!data || !data.length) { box.innerHTML = `<div class="card p-6 text-center font-display text-2xl">No game scheduled yet</div>`; return; }
+  if (!best) { box.innerHTML = `<div class="card p-6 text-center font-display text-2xl">No game scheduled yet</div>`; return; }
 
-  const g = data[0], links = mapLinks(g.field_name);
+  const teams = await teamMapFor(best.season);
+  const g = { ...best.game, home: teams[best.game.home_team_id], away: teams[best.game.away_team_id] };
+  const links = mapLinks(g.field_name);
   const main = isApple ? links.apple : links.google;
   box.innerHTML = `
   <div class="neon rise" style="animation-delay:.5s"><div class="in p-5">
     <div class="flex items-center justify-between mb-4">
       <span class="font-display text-2xl tracking-widest text-orange">NEXT GAME</span>
-      <span class="text-[11px] text-white/60 text-right">${esc(g.league_name)}</span>
+      <span class="text-[11px] text-white/60 text-right">${esc(g.league_name)} &middot; Season ${best.season}</span>
     </div>
     ${g.round_label ? `<div class="text-center mb-4"><span class="round">${esc(g.round_label)}</span></div>` : ''}
     <div class="flex items-start">
@@ -230,7 +251,6 @@ function startCountdown(target) {
 }
 
 /* ---------- Roster ---------- */
-// Kickball positions, in roster sort order (after the Captain)
 const POSITION_ORDER = ['P', 'C', '1B', '2B', '3B', 'SS', 'L', 'SL', 'LC', 'RC', 'SR', 'R'];
 
 const POS_ALIAS = {
@@ -382,29 +402,41 @@ async function renderSchedule() {
   app.innerHTML = `
   <div class="px-4 py-6">
     <h2 class="font-display text-5xl mb-4">THE <span class="text-orange">SCHEDULE</span></h2>
+    <div id="chips" class="flex flex-wrap gap-2 mb-4"></div>
     <div class="grid grid-cols-2 gap-2 mb-4">
       <button id="tabA" class="py-2 rounded-lg font-display text-2xl bg-orange">Active</button>
       <button id="tabP" class="py-2 rounded-lg font-display text-2xl bg-white/10">Past</button>
     </div>
     <div id="list" class="space-y-3 text-white/60">Loading...</div>
   </div>`;
-  const { data, error } = await db.from('tournaments')
-    .select('*, home:teams!home_team_id(*), away:teams!away_team_id(*)')
-    .order('match_at', { ascending: true });
+
   const list = document.getElementById('list');
-  if (!list) return;
-  if (error) { list.textContent = 'Could not load schedule: ' + error.message; return; }
+  let season = Number(sessionStorage.getItem('kdz_season')) || 0;
+  let activeTab = true;
+  let cache = { games: [], teams: {} };
+
+  const drawChips = () => {
+    const box = document.getElementById('chips');
+    if (!box) return;
+    box.innerHTML = SEASON_NUMS.map(n =>
+      `<button data-s="${n}" class="px-3 py-1 rounded-lg font-display text-xl ${n === season ? 'bg-orange' : 'bg-white/10'}">Season ${n}</button>`).join('');
+    box.querySelectorAll('button').forEach(b => b.onclick = () => load(Number(b.dataset.s)));
+  };
 
   const show = active => {
-    document.getElementById('tabA').className = 'py-2 rounded-lg font-display text-2xl ' + (active ? 'bg-orange' : 'bg-white/10');
-    document.getElementById('tabP').className = 'py-2 rounded-lg font-display text-2xl ' + (active ? 'bg-white/10' : 'bg-orange');
-    const rows = data.filter(g => g.is_active === active);
+    activeTab = active;
+    const ta = document.getElementById('tabA'), tp = document.getElementById('tabP');
+    if (!ta || !tp) return;
+    ta.className = 'py-2 rounded-lg font-display text-2xl ' + (active ? 'bg-orange' : 'bg-white/10');
+    tp.className = 'py-2 rounded-lg font-display text-2xl ' + (active ? 'bg-white/10' : 'bg-orange');
+    const rows = cache.games.filter(g => g.is_active === active);
     list.className = 'space-y-3';
     list.innerHTML = rows.length ? rows.map(g => {
       const l = mapLinks(g.field_name);
+      const home = cache.teams[g.home_team_id], away = cache.teams[g.away_team_id];
       return `<div class="card p-4">
-        <div class="text-xs text-orange font-bold tracking-widest">${esc(g.league_name)}${g.round_label ? ' &middot; ' + esc(g.round_label) : ''}</div>
-        <div class="font-display text-2xl mt-1">${esc(g.home?.team_name || 'TBD')} <span class="text-orange">VS</span> ${esc(g.away?.team_name || 'TBD')}</div>
+        <div class="text-xs text-orange font-bold tracking-widest">${esc(g.league_name)} &middot; Season ${season}${g.round_label ? ' &middot; ' + esc(g.round_label) : ''}</div>
+        <div class="font-display text-2xl mt-1">${esc(home?.team_name || 'TBD')} <span class="text-orange">VS</span> ${esc(away?.team_name || 'TBD')}</div>
         <div class="text-sm mt-1">${esc(fmtDate(g))}</div>
         <div class="text-sm text-white/70">${esc(g.field_name)}, ${esc(g.field_number)}</div>
         <div class="flex gap-3 mt-3 text-sm font-semibold">
@@ -414,9 +446,31 @@ async function renderSchedule() {
       </div>`;
     }).join('') : '<div class="text-white/60">Nothing here yet.</div>';
   };
+
+  async function load(n) {
+    season = n;
+    sessionStorage.setItem('kdz_season', String(n));
+    drawChips();
+    list.className = 'space-y-3 text-white/60';
+    list.textContent = 'Loading...';
+    const [g, teams] = await Promise.all([
+      db.from(gamesT(n)).select('*').order('match_at', { ascending: true }),
+      teamMapFor(n)
+    ]);
+    if (!document.getElementById('list')) return;
+    if (g.error) { list.textContent = `Could not load Season ${n}: ` + g.error.message; return; }
+    cache = { games: g.data || [], teams };
+    show(activeTab);
+  }
+
   document.getElementById('tabA').onclick = () => show(true);
   document.getElementById('tabP').onclick = () => show(false);
-  show(true);
+
+  if (!season) {
+    const { best } = await findActiveGame();
+    season = best ? best.season : 1;
+  }
+  load(season);
 }
 
 /* ---------- Router ---------- */
