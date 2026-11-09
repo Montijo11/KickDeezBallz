@@ -65,6 +65,10 @@
     box-shadow:0 0 12px rgba(228,68,12,.7), 0 2px 6px rgba(0,0,0,.5); }
   .pos.multi .dot { background:#E4440C; }
   .pos:hover .dot, .pos.open .dot { transform:scale(1.12); }
+  .pos.empty { z-index:3; }
+  .pos.empty .dot { background:rgba(16,28,46,.45); border:2px dashed rgba(255,255,255,.6); box-shadow:none;
+    color:rgba(255,255,255,.85); font-size:15px; letter-spacing:.04em; }
+  .pos.empty:hover .dot { transform:none; }
   .cnt { position:absolute; top:-7px; right:-7px; min-width:16px; height:16px; padding:0 3px; border-radius:9999px; background:#fff; color:#101C2E;
     font:800 10px/16px 'Inter',sans-serif; text-align:center; }
   .star { position:absolute; top:-9px; left:-6px; font-size:13px; color:#FFD34D; text-shadow:0 0 4px #000; }
@@ -328,6 +332,14 @@ function fieldHTML(players) {
     ps.forEach(k => (groups[k] = groups[k] || []).push(p));
   });
 
+  // Empty positions: dashed circle with the position code
+  const empties = POSITION_ORDER.filter(k => !groups[k]).map((k, j) => {
+    const [x, y] = SPOTS[k];
+    return `<div class="pos empty" style="left:${(x / 4).toFixed(2)}%;top:${(y / 3.8).toFixed(2)}%">
+      <div class="spot" style="--d:${(0.05 + j * 0.05).toFixed(2)}s" title="${esc(k)} (open)"><div class="dot">${esc(k)}</div></div>
+    </div>`;
+  }).join('');
+
   let i = 0;
   const spots = Object.keys(groups).map(k => {
     const list = groups[k], [x, y] = SPOTS[k];
@@ -358,8 +370,8 @@ function fieldHTML(players) {
     ? `<p class="text-center text-[11px] text-red-300 mt-2">No valid position set: ${unassigned.map(p => esc(p.player_name)).join(', ')}</p>`
     : '';
 
-  return `<div class="card p-3 mb-5"><div class="field">${fieldSVG()}${spots}</div>
-    <p class="text-center text-[11px] text-white/50 mt-2">Hover or tap a <span class="text-orange font-bold">&#9776;</span> spot to see everyone at that position</p>${note}</div>`;
+  return `<div class="card p-3 mb-5"><div class="field">${fieldSVG()}${empties}${spots}</div>
+    <p class="text-center text-[11px] text-white/50 mt-2">Hover or tap a <span class="text-orange font-bold">&#9776;</span> spot to see everyone at that position. Dashed circles are open positions.</p>${note}</div>`;
 }
 
 async function renderRoster() {
@@ -403,17 +415,11 @@ async function renderSchedule() {
   <div class="px-4 py-6">
     <h2 class="font-display text-5xl mb-4">THE <span class="text-orange">SCHEDULE</span></h2>
     <div id="chips" class="flex flex-wrap gap-2 mb-4"></div>
-    <div class="grid grid-cols-2 gap-2 mb-4">
-      <button id="tabA" class="py-2 rounded-lg font-display text-2xl bg-orange">Active</button>
-      <button id="tabP" class="py-2 rounded-lg font-display text-2xl bg-white/10">Past</button>
-    </div>
     <div id="list" class="space-y-3 text-white/60">Loading...</div>
   </div>`;
 
   const list = document.getElementById('list');
   let season = Number(sessionStorage.getItem('kdz_season')) || 0;
-  let activeTab = true;
-  let cache = { games: [], teams: {} };
 
   const drawChips = () => {
     const box = document.getElementById('chips');
@@ -421,30 +427,6 @@ async function renderSchedule() {
     box.innerHTML = SEASON_NUMS.map(n =>
       `<button data-s="${n}" class="px-3 py-1 rounded-lg font-display text-xl ${n === season ? 'bg-orange' : 'bg-white/10'}">Season ${n}</button>`).join('');
     box.querySelectorAll('button').forEach(b => b.onclick = () => load(Number(b.dataset.s)));
-  };
-
-  const show = active => {
-    activeTab = active;
-    const ta = document.getElementById('tabA'), tp = document.getElementById('tabP');
-    if (!ta || !tp) return;
-    ta.className = 'py-2 rounded-lg font-display text-2xl ' + (active ? 'bg-orange' : 'bg-white/10');
-    tp.className = 'py-2 rounded-lg font-display text-2xl ' + (active ? 'bg-white/10' : 'bg-orange');
-    const rows = cache.games.filter(g => g.is_active === active);
-    list.className = 'space-y-3';
-    list.innerHTML = rows.length ? rows.map(g => {
-      const l = mapLinks(g.field_name);
-      const home = cache.teams[g.home_team_id], away = cache.teams[g.away_team_id];
-      return `<div class="card p-4">
-        <div class="text-xs text-orange font-bold tracking-widest">${esc(g.league_name)} &middot; Season ${season}${g.round_label ? ' &middot; ' + esc(g.round_label) : ''}</div>
-        <div class="font-display text-2xl mt-1">${esc(home?.team_name || 'TBD')} <span class="text-orange">VS</span> ${esc(away?.team_name || 'TBD')}</div>
-        <div class="text-sm mt-1">${esc(fmtDate(g))}</div>
-        <div class="text-sm text-white/70">${esc(g.field_name)}, ${esc(g.field_number)}</div>
-        <div class="flex gap-3 mt-3 text-sm font-semibold">
-          <a class="text-orange underline" target="_blank" rel="noopener" href="${l.google}">Google Maps</a>
-          <a class="text-orange underline" target="_blank" rel="noopener" href="${l.apple}">Apple Maps</a>
-        </div>
-      </div>`;
-    }).join('') : '<div class="text-white/60">Nothing here yet.</div>';
   };
 
   async function load(n) {
@@ -459,16 +441,27 @@ async function renderSchedule() {
     ]);
     if (!document.getElementById('list')) return;
     if (g.error) { list.textContent = `Could not load Season ${n}: ` + g.error.message; return; }
-    cache = { games: g.data || [], teams };
-    show(activeTab);
+    const games = g.data || [];
+    list.className = 'space-y-3';
+    list.innerHTML = games.length ? games.map(game => {
+      const l = mapLinks(game.field_name);
+      const home = teams[game.home_team_id], away = teams[game.away_team_id];
+      return `<div class="card p-4">
+        <div class="text-xs text-orange font-bold tracking-widest">${esc(game.league_name)} &middot; Season ${n}${game.round_label ? ' &middot; ' + esc(game.round_label) : ''}</div>
+        <div class="font-display text-2xl mt-1">${esc(home?.team_name || 'TBD')} <span class="text-orange">VS</span> ${esc(away?.team_name || 'TBD')}</div>
+        <div class="text-sm mt-1">${esc(fmtDate(game))}</div>
+        <div class="text-sm text-white/70">${esc(game.field_name)}, ${esc(game.field_number)}</div>
+        <div class="flex gap-3 mt-3 text-sm font-semibold">
+          <a class="text-orange underline" target="_blank" rel="noopener" href="${l.google}">Google Maps</a>
+          <a class="text-orange underline" target="_blank" rel="noopener" href="${l.apple}">Apple Maps</a>
+        </div>
+      </div>`;
+    }).join('') : '<div class="text-white/60">Nothing here yet.</div>';
   }
-
-  document.getElementById('tabA').onclick = () => show(true);
-  document.getElementById('tabP').onclick = () => show(false);
 
   if (!season) {
     const { best } = await findActiveGame();
-    season = best ? best.season : 1;
+    season = best ? best.season : 7;
   }
   load(season);
 }
