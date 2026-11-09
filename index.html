@@ -255,10 +255,11 @@ function startCountdown(target) {
 }
 
 /* ---------- Roster ---------- */
-const POSITION_ORDER = ['P', 'C', '1B', '2B', '3B', 'SS', 'L', 'SL', 'LC', 'RC', 'SR', 'R'];
+const POSITION_ORDER = ['P', 'C', '1B', '2B', '3B', 'SS', 'IF', 'L', 'SL', 'LC', 'RC', 'SR', 'R', 'OF'];
 
 const POS_ALIAS = {
   'PITCHER':'P', 'CATCHER':'C', 'FIRST BASE':'1B', 'SECOND BASE':'2B', 'THIRD BASE':'3B', 'SHORTSTOP':'SS',
+  'INFIELD':'IF', 'OUTFIELD':'OF',
   'LEFT FIELD':'L', 'LF':'L', 'SHORT LEFT':'SL', 'LEFT CENTER':'LC', 'LCF':'LC',
   'RIGHT CENTER':'RC', 'RCF':'RC', 'SHORT RIGHT':'SR', 'RIGHT FIELD':'R', 'RF':'R'
 };
@@ -268,8 +269,10 @@ const normPos = raw => { const u = String(raw || '').trim().toUpperCase(); retur
 const SPOTS = {
   'P':[200,258],  'C':[200,352],
   '1B':[305,250], '2B':[245,208], 'SS':[155,208], '3B':[95,250],
-  'SL':[155,160], 'SR':[245,160],
-  'L':[58,140],   'LC':[148,100], 'RC':[252,100], 'R':[342,140]
+  'IF':[200,212],
+  'SL':[155,172], 'SR':[245,172],
+  'L':[58,140],   'LC':[148,100], 'RC':[252,100], 'R':[342,140],
+  'OF':[200,120]
 };
 
 // A player can have several positions, e.g. "R, RC" or "R/RC" or "R and RC" or "R RC"
@@ -325,11 +328,9 @@ function fieldSVG() {
 }
 
 function fieldHTML(players) {
-  const groups = {}, unassigned = [];
+  const groups = {};
   players.forEach(p => {
-    const ps = parsePositions(p.preferred_position);
-    if (!ps.length) { unassigned.push(p); return; }
-    ps.forEach(k => (groups[k] = groups[k] || []).push(p));
+    parsePositions(p.preferred_position).forEach(k => (groups[k] = groups[k] || []).push(p));
   });
 
   // Empty positions: dashed circle with the position code
@@ -366,12 +367,8 @@ function fieldHTML(players) {
     return `<div class="${cls}" style="left:${(x / 4).toFixed(2)}%;top:${(y / 3.8).toFixed(2)}%">${inner}</div>`;
   }).join('');
 
-  const note = unassigned.length
-    ? `<p class="text-center text-[11px] text-red-300 mt-2">No valid position set: ${unassigned.map(p => esc(p.player_name)).join(', ')}</p>`
-    : '';
-
   return `<div class="card p-3 mb-5"><div class="field">${fieldSVG()}${empties}${spots}</div>
-    <p class="text-center text-[11px] text-white/50 mt-2">Hover or tap a <span class="text-orange font-bold">&#9776;</span> spot to see everyone at that position. Dashed circles are open positions.</p>${note}</div>`;
+    <p class="text-center text-[11px] text-white/50 mt-2">Hover or tap a <span class="text-orange font-bold">&#9776;</span> spot to see everyone at that position. Dashed circles are open positions.</p></div>`;
 }
 
 async function renderRoster() {
