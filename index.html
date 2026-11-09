@@ -213,7 +213,7 @@ async function renderRoster() {
       <div class="flex-1 min-w-0">
         <div class="font-display text-2xl leading-tight truncate">${esc(p.player_name)}</div>
         <div class="text-sm text-white/70">${esc(p.preferred_position)}</div>
-        <span class="inline-block mt-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange/20 text-orange border border-orange/40">${esc(p.status_tag)}</span>
+        ${p.status_tag ? `<span class="inline-block mt-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange/20 text-orange border border-orange/40">${esc(p.status_tag)}</span>` : ''}
       </div>
       <div class="font-display text-4xl text-orange">#${esc(p.jersey_number)}</div>
     </div>`).join('');
@@ -274,4 +274,4 @@ window.addEventListener('hashchange', route);
 route();
 </script>
 </body>
-</html>z
+</html>
