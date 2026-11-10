@@ -650,6 +650,9 @@ async function renderAchievements() {
 const COMING_SOON = { gallery: false, merch: true };
 document.querySelectorAll('[data-soon]').forEach(el => { if (!COMING_SOON[el.dataset.soon]) el.remove(); });
 
+// Name of your Supabase Edge Function (must match exactly)
+const UPLOAD_FN = 'rapid-api';
+
 function renderSoon(word, blurb) {
   app.innerHTML = `
   <div class="px-4 py-6">
@@ -686,12 +689,12 @@ async function prepPhoto(file) {
 async function uploadOne(kind, file, pin, name, caption) {
   let blob = file, ext = (file.name.split('.').pop() || '').toLowerCase(), type = file.type;
   if (kind === 'photo') ({ blob, ext, type } = await prepPhoto(file));
-  const s = await db.functions.invoke('team-upload', { body: { action: 'sign', kind, pin, ext } });
+  const s = await db.functions.invoke(UPLOAD_FN, { body: { action: 'sign', kind, pin, ext } });
   if (s.error) throw new Error(s.error.message);
   if (!s.data?.ok) throw new Error(s.data?.error || 'Upload not allowed');
   const up = await db.storage.from('photos').uploadToSignedUrl(s.data.path, s.data.token, blob, { contentType: type });
   if (up.error) throw new Error(up.error.message);
-  const c = await db.functions.invoke('team-upload', { body: { action: 'commit', kind, pin, path: s.data.path, caption, name } });
+  const c = await db.functions.invoke(UPLOAD_FN, { body: { action: 'commit', kind, pin, path: s.data.path, caption, name } });
   if (c.error) throw new Error(c.error.message);
   if (!c.data?.ok) throw new Error(c.data?.error || 'Could not save');
 }
