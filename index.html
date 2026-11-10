@@ -1054,36 +1054,88 @@ async function renderGallery() {
 }
 
 async function renderMerch() {
-  if (COMING_SOON.merch) return renderSoon('MERCH', 'KickDeezBallz gear is on the way. Check back soon.');
-  app.innerHTML = `
-  <div class="px-4 py-6">
-    <h2 class="font-display text-5xl mb-4">THE <span class="text-orange">MERCH</span></h2>
-    <div id="list" class="text-white/60">Loading...</div>
-  </div>`;
-  const list = document.getElementById('list');
-  const { data, error } = await db.from('merch_items').select('*').order('sort_order', { ascending: true });
-  if (!document.getElementById('list')) return;
-  if (error) { list.textContent = 'Could not load merch: ' + error.message; return; }
-  if (!data.length) { list.textContent = 'Merch coming soon.'; return; }
-  list.className = 'grid grid-cols-2 gap-3';
-  list.innerHTML = data.map(m => {
-    const url = safeUrl(m.buy_url);
-    const price = m.price != null ? '$' + Number(m.price).toFixed(2) : '';
-    const btn = m.sold_out || !url
-      ? `<div class="mt-3 text-center font-display text-xl py-2 rounded-xl bg-white/10 text-white/60">${m.sold_out ? 'SOLD OUT' : 'COMING SOON'}</div>`
-      : `<a href="${esc(url)}" target="_blank" rel="noopener" class="mt-3 block text-center font-display text-xl py-2 rounded-xl bg-orange active:scale-95 transition">BUY NOW</a>`;
-    return `<div class="card p-3 flex flex-col">
-      <div class="aspect-square overflow-hidden rounded-lg bg-navy">
-        ${m.image_path ? `<img src="${esc(photoUrl(m.image_path))}" alt="${esc(m.name)}" loading="lazy" class="w-full h-full object-cover">` : ''}
+  app.innerHTML = `<div class="px-4 py-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-display text-5xl">TEAM <span class="text-orange">MERCH</span></h2>
+      <div id="msz" class="flex gap-1">
+        ${['s','m','l'].map(k => `<button data-k="${k}" class="font-display text-xl px-3 py-1 rounded-lg border border-white/30">${k.toUpperCase()}</button>`).join('')}
       </div>
-      <div class="font-display text-2xl leading-tight mt-2">${esc(m.name)}</div>
-      ${m.description ? `<div class="text-xs text-white/70 mt-1">${esc(m.description)}</div>` : ''}
-      <div class="font-display text-2xl text-orange mt-1">${esc(price)}</div>
-      <div class="mt-auto">${btn}</div>
-    </div>`;
-  }).join('');
-}
+    </div>
+    <div id="mgrid" class="ggrid m text-white/60">Loading...</div>
+  </div>`;
 
+  const { data, error } = await db.from('merch_items').select('*').order('sort_order', { ascending: true });
+  const grid = document.getElementById('mgrid');
+  if (!grid) return;
+  if (error) { grid.textContent = 'Could not load merch: ' + error.message; return; }
+  if (!data.length) { grid.textContent = 'No merch yet.'; return; }
+
+  const items = data.map(it => ({
+    ...it,
+    url: db.storage.from('photos').getPublicUrl(it.image_path).data.publicUrl
+  }));
+  const money = n => '$' + Number(n).toFixed(2);
+
+  grid.innerHTML = items.map((it, i) => `
+    <button class="gitem relative block w-full text-left" data-i="${i}" aria-label="${esc(it.name)}">
+      <img src="${esc(it.url)}" alt="${esc(it.name)}" loading="lazy" class="w-full aspect-square object-cover rounded-lg">
+      <span class="absolute bottom-1 left-1 bg-navy/85 border border-orange rounded-full px-2 py-0.5 font-display text-lg">${money(it.price)}</span>
+    </button>`).join('');
+
+  document.getElementById('msz').addEventListener('click', e => {
+    const k = e.target.dataset.k; if (!k) return;
+    grid.className = 'ggrid ' + k;
+  });
+
+  let cur = 0;
+  const box = document.createElement('div');
+  box.className = 'fixed inset-0 z-[70] bg-black/95 hidden flex flex-col';
+  document.body.appendChild(box);
+
+  const show = i => {
+    cur = (i + items.length) % items.length;
+    const it = items[cur];
+    box.classList.remove('hidden');
+    box.innerHTML = `
+      <div class="flex justify-between items-center p-4">
+        <span class="text-white/60 text-sm">${cur + 1} / ${items.length}</span>
+        <button id="mx" class="text-4xl leading-none" aria-label="Close">&times;</button>
+      </div>
+      <div class="flex-1 flex items-center justify-center px-2 min-h-0">
+        <button id="mp" class="text-4xl px-2" aria-label="Previous">&#8249;</button>
+        <img src="${esc(it.url)}" alt="${esc(it.name)}" class="max-h-full max-w-full object-contain">
+        <button id="mn" class="text-4xl px-2" aria-label="Next">&#8250;</button>
+      </div>
+      <div class="p-5 text-center">
+        <div class="font-display text-3xl">${esc(it.name)} &middot; <span class="text-orange">${money(it.price)}</span></div>
+        <p class="text-sm text-white/70 mt-1">${esc(it.description || '')}</p>
+        <a href="${esc(it.buy_url)}" target="_blank" rel="noopener"
+           class="inline-block mt-3 bg-orange text-white font-display text-2xl px-10 py-3 rounded-xl active:scale-95 transition">BUY NOW</a>
+      </div>`;
+    box.querySelector('#mx').onclick = () => box.classList.add('hidden');
+    box.querySelector('#mp').onclick = () => show(cur - 1);
+    box.querySelector('#mn').onclick = () => show(cur + 1);
+  };
+
+  grid.addEventListener('click', e => {
+    const t = e.target.closest('.gitem'); if (t) show(+t.dataset.i);
+  });
+
+  let sx = null;
+  box.addEventListener('touchstart', e => { sx = e.touches[0].clientX; }, { passive: true });
+  box.addEventListener('touchend', e => {
+    if (sx === null) return;
+    const dx = e.changedTouches[0].clientX - sx; sx = null;
+    if (Math.abs(dx) > 50) show(cur + (dx < 0 ? 1 : -1));
+  });
+  document.addEventListener('keydown', function k(e) {
+    if (!document.body.contains(box)) return document.removeEventListener('keydown', k);
+    if (box.classList.contains('hidden')) return;
+    if (e.key === 'Escape') box.classList.add('hidden');
+    if (e.key === 'ArrowLeft') show(cur - 1);
+    if (e.key === 'ArrowRight') show(cur + 1);
+  });
+}
 /* ---------- Router ---------- */
 function route() {
   clearInterval(timer);
