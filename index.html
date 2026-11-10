@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#101C2E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="KickDeezBallz">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>KickDeezBallz</title>
 <meta name="description" content="KickDeezBallz - next game, schedule and roster for our coed kickball team.">
 <link rel="icon" type="image/jpeg" href="KDZ.jpeg">
@@ -116,7 +122,7 @@
 </header>
 
 <div id="overlay" class="fixed inset-0 bg-black/60 z-[55] hidden"></div>
-<nav id="drawer" class="fixed top-0 right-0 h-full w-72 bg-navy z-[60] translate-x-full transition-transform duration-300 border-l border-orange/40 p-6">
+<nav id="drawer" class="fixed top-0 right-0 h-full w-72 bg-navy z-[60] translate-x-full transition-transform duration-300 border-l border-orange/40 p-6 overflow-y-auto">
   <button id="closeBtn" aria-label="Close menu" class="absolute top-4 right-4 text-3xl leading-none">&times;</button>
   <div class="font-display text-4xl mt-8 mb-8">KICK <span class="text-orange">DEEZ</span> BALLZ</div>
   <a href="#/" class="navlink block py-3 font-display text-3xl border-b border-white/10">Home</a>
@@ -124,6 +130,8 @@
   <a href="#/standings" class="navlink block py-3 font-display text-3xl border-b border-white/10">Standings</a>
   <a href="#/roster" class="navlink block py-3 font-display text-3xl border-b border-white/10">Roster</a>
   <a href="#/achievements" class="navlink block py-3 font-display text-3xl border-b border-white/10">Achievements</a>
+  <a href="#/gallery" class="navlink block py-3 font-display text-3xl border-b border-white/10">Gallery</a>
+  <a href="#/merch" class="navlink block py-3 font-display text-3xl border-b border-white/10">Merch</a>
 </nav>
 
 <main id="app" class="pt-16 min-h-screen"></main>
@@ -637,6 +645,75 @@ async function renderAchievements() {
   }).join('') : '<div class="text-white/60">No achievements yet.</div>';
 }
 
+/* ---------- Photos, Gallery, Merch ---------- */
+const photoUrl = p => p ? db.storage.from('photos').getPublicUrl(p).data.publicUrl : '';
+const safeUrl = u => /^https:\/\//i.test(u || '') ? u : '';
+
+async function renderGallery() {
+  app.innerHTML = `
+  <div class="px-4 py-6">
+    <h2 class="font-display text-5xl mb-4">THE <span class="text-orange">GALLERY</span></h2>
+    <div id="list" class="text-white/60">Loading...</div>
+  </div>
+  <div id="lb" class="fixed inset-0 bg-black/90 z-[70] hidden items-center justify-center p-4">
+    <button id="lbClose" aria-label="Close" class="absolute top-4 right-5 text-4xl leading-none">&times;</button>
+    <figure class="max-w-full max-h-full text-center">
+      <img id="lbImg" class="max-h-[80vh] max-w-full mx-auto rounded-lg" alt="">
+      <figcaption id="lbCap" class="mt-3 text-sm text-white/80"></figcaption>
+    </figure>
+  </div>`;
+  const list = document.getElementById('list');
+  const { data, error } = await db.from('gallery_photos').select('*')
+    .order('sort_order', { ascending: true }).order('created_at', { ascending: false });
+  if (!document.getElementById('list')) return;
+  if (error) { list.textContent = 'Could not load photos: ' + error.message; return; }
+  if (!data.length) { list.textContent = 'No photos yet.'; return; }
+  list.className = 'grid grid-cols-2 gap-2';
+  list.innerHTML = data.map((p, i) => `
+    <button data-i="${i}" class="block overflow-hidden rounded-xl border border-white/10 bg-[#16253B] aspect-square">
+      <img src="${esc(photoUrl(p.image_path))}" alt="${esc(p.caption || 'Team photo')}" loading="lazy" class="w-full h-full object-cover">
+    </button>`).join('');
+  const lb = document.getElementById('lb');
+  const close = () => { lb.classList.add('hidden'); lb.classList.remove('flex'); };
+  list.querySelectorAll('button').forEach(b => b.onclick = () => {
+    const p = data[Number(b.dataset.i)];
+    document.getElementById('lbImg').src = photoUrl(p.image_path);
+    document.getElementById('lbCap').textContent = p.caption || '';
+    lb.classList.remove('hidden'); lb.classList.add('flex');
+  });
+  lb.onclick = e => { if (e.target.id !== 'lbImg') close(); };
+}
+
+async function renderMerch() {
+  app.innerHTML = `
+  <div class="px-4 py-6">
+    <h2 class="font-display text-5xl mb-4">THE <span class="text-orange">MERCH</span></h2>
+    <div id="list" class="text-white/60">Loading...</div>
+  </div>`;
+  const list = document.getElementById('list');
+  const { data, error } = await db.from('merch_items').select('*').order('sort_order', { ascending: true });
+  if (!document.getElementById('list')) return;
+  if (error) { list.textContent = 'Could not load merch: ' + error.message; return; }
+  if (!data.length) { list.textContent = 'Merch coming soon.'; return; }
+  list.className = 'grid grid-cols-2 gap-3';
+  list.innerHTML = data.map(m => {
+    const url = safeUrl(m.buy_url);
+    const price = m.price != null ? '$' + Number(m.price).toFixed(2) : '';
+    const btn = m.sold_out || !url
+      ? `<div class="mt-3 text-center font-display text-xl py-2 rounded-xl bg-white/10 text-white/60">${m.sold_out ? 'SOLD OUT' : 'COMING SOON'}</div>`
+      : `<a href="${esc(url)}" target="_blank" rel="noopener" class="mt-3 block text-center font-display text-xl py-2 rounded-xl bg-orange active:scale-95 transition">BUY NOW</a>`;
+    return `<div class="card p-3 flex flex-col">
+      <div class="aspect-square overflow-hidden rounded-lg bg-navy">
+        ${m.image_path ? `<img src="${esc(photoUrl(m.image_path))}" alt="${esc(m.name)}" loading="lazy" class="w-full h-full object-cover">` : ''}
+      </div>
+      <div class="font-display text-2xl leading-tight mt-2">${esc(m.name)}</div>
+      ${m.description ? `<div class="text-xs text-white/70 mt-1">${esc(m.description)}</div>` : ''}
+      <div class="font-display text-2xl text-orange mt-1">${esc(price)}</div>
+      <div class="mt-auto">${btn}</div>
+    </div>`;
+  }).join('');
+}
+
 /* ---------- Router ---------- */
 function route() {
   clearInterval(timer);
@@ -646,9 +723,15 @@ function route() {
   else if (h === '#/schedule') renderSchedule();
   else if (h === '#/standings') renderStandings();
   else if (h === '#/achievements') renderAchievements();
+  else if (h === '#/gallery') renderGallery();
+  else if (h === '#/merch') renderMerch();
   else renderHome();
 }
 window.addEventListener('hashchange', route);
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+}
 route();
 </script>
 </body>
