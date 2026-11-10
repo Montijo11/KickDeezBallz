@@ -130,8 +130,8 @@
   <a href="#/standings" class="navlink block py-3 font-display text-3xl border-b border-white/10">Standings</a>
   <a href="#/roster" class="navlink block py-3 font-display text-3xl border-b border-white/10">Roster</a>
   <a href="#/achievements" class="navlink block py-3 font-display text-3xl border-b border-white/10">Achievements</a>
-  <a href="#/gallery" class="navlink block py-3 font-display text-3xl border-b border-white/10">Gallery</a>
-  <a href="#/merch" class="navlink block py-3 font-display text-3xl border-b border-white/10">Merch</a>
+  <a href="#/gallery" class="navlink block py-3 font-display text-3xl border-b border-white/10">Gallery<span data-soon="gallery" class="ml-2 align-middle font-body text-[10px] font-bold tracking-widest text-orange border border-orange/60 rounded-full px-2 py-0.5">COMING SOON</span></a>
+  <a href="#/merch" class="navlink block py-3 font-display text-3xl border-b border-white/10">Merch<span data-soon="merch" class="ml-2 align-middle font-body text-[10px] font-bold tracking-widest text-orange border border-orange/60 rounded-full px-2 py-0.5">COMING SOON</span></a>
 </nav>
 
 <main id="app" class="pt-16 min-h-screen"></main>
@@ -646,10 +646,28 @@ async function renderAchievements() {
 }
 
 /* ---------- Photos, Gallery, Merch ---------- */
+// Set a section to false to launch it. The menu badge disappears and the real page opens.
+const COMING_SOON = { gallery: true, merch: true };
+document.querySelectorAll('[data-soon]').forEach(el => { if (!COMING_SOON[el.dataset.soon]) el.remove(); });
+
+function renderSoon(word, blurb) {
+  app.innerHTML = `
+  <div class="px-4 py-6">
+    <h2 class="font-display text-5xl mb-4">THE <span class="text-orange">${esc(word)}</span></h2>
+    <div class="neon rise"><div class="in p-8 text-center">
+      <img src="KDZ.jpeg" alt="" class="h-20 w-20 rounded-2xl object-cover border-2 border-orange mx-auto mb-5" onerror="this.style.display='none'">
+      <div class="round">COMING SOON</div>
+      <p class="text-white/80 mt-5 leading-relaxed">${esc(blurb)}</p>
+      <a href="#/" class="inline-block mt-6 border-2 border-white text-white font-display text-2xl px-8 py-3 rounded-xl active:scale-95 transition">Back Home</a>
+    </div></div>
+  </div>`;
+}
+
 const photoUrl = p => p ? db.storage.from('photos').getPublicUrl(p).data.publicUrl : '';
 const safeUrl = u => /^https:\/\//i.test(u || '') ? u : '';
 
 async function renderGallery() {
+  if (COMING_SOON.gallery) return renderSoon('GALLERY', 'Team photos are on the way. Check back soon.');
   app.innerHTML = `
   <div class="px-4 py-6">
     <h2 class="font-display text-5xl mb-4">THE <span class="text-orange">GALLERY</span></h2>
@@ -685,6 +703,7 @@ async function renderGallery() {
 }
 
 async function renderMerch() {
+  if (COMING_SOON.merch) return renderSoon('MERCH', 'KickDeezBallz gear is on the way. Check back soon.');
   app.innerHTML = `
   <div class="px-4 py-6">
     <h2 class="font-display text-5xl mb-4">THE <span class="text-orange">MERCH</span></h2>
