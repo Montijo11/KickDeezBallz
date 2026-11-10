@@ -78,6 +78,9 @@
   .ggrid.s { grid-template-columns:repeat(4,minmax(0,1fr)); }
   .ggrid.m { grid-template-columns:repeat(3,minmax(0,1fr)); }
   .ggrid.l { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .gitem.sel { outline:3px solid #E4440C; outline-offset:-3px; }
+  .gcheck { position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:9999px; background:#E4440C; color:#fff;
+    font:800 13px/22px 'Inter',sans-serif; text-align:center; }
 
   /* ---------- Field ---------- */
   .field { position:relative; width:100%; max-width:480px; margin:0 auto; aspect-ratio:400/380; }
@@ -693,93 +696,198 @@ async function prepPhoto(file) {
 let galleryAlbum = '__all__';
 let galleryType = 'all';
 let gallerySize = localStorage.getItem('kdz_gsize') || 'm';
+let selectMode = false;
+const selected = new Set();
+let allAlbums = [];
 
-async function uploadOne(kind, file, pin, name, caption, album) {
-  let blob = file, ext = (file.name.split('.').pop() || '').toLowerCase(), type = file.type;
-  if (kind === 'photo') ({ blob, ext, type } = await prepPhoto(file));
-  const s = await db.functions.invoke(UPLOAD_FN, { body: { action: 'sign', kind, pin, ext } });
-  if (s.error) throw new Error(s.error.message);
-  if (!s.data?.ok) throw new Error(s.data?.error || 'Upload not allowed');
-  const up = await db.storage.from('photos').uploadToSignedUrl(s.data.path, s.data.token, blob, { contentType: type });
-  if (up.error) throw new Error(up.error.message);
-  const c = await db.functions.invoke(UPLOAD_FN, { body: { action: 'commit', kind, pin, path: s.data.path, caption, name, album } });
-  if (c.error) throw new Error(c.error.message);
-  if (!c.data?.ok) throw new Error(c.data?.error || 'Could not save');
+// Talk to the Supabase function (PIN-protected actions)
+async function adminCall(body) {
+  const r = await db.functions.invoke(UPLOAD_FN, { body });
+  if (r.error) throw new Error(r.error.message);
+  if (!r.data?.ok) throw new Error(r.data?.error || 'Something went wrong');
+  return r.data;
 }
 
-async function openUpload(kind, startNewAlbum) {
+// Reusable popup with a PIN field. onOk(pin) runs when the user taps the button.
+function pinModal(title, bodyHTML, okLabel, onOk, after) {
   const m = document.getElementById('upModal');
-  const isVid = kind === 'video';
-  let albums = [];
-  try {
-    const r = await db.from('gallery_photos').select('album');
-    albums = [...new Set((r.data || []).map(x => x.album).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  } catch (e) {}
-  const pre = (galleryAlbum !== '__all__' && galleryAlbum !== '__none__') ? galleryAlbum : '';
   m.innerHTML = `
   <div class="card w-full max-w-sm p-5 max-h-[90vh] overflow-y-auto">
-    <div class="font-display text-3xl mb-3">ADD <span class="text-orange">${isVid ? 'VIDEO' : 'PHOTOS'}</span></div>
+    <div class="font-display text-3xl mb-3">${title}</div>
     <label class="text-xs text-white/70">Team PIN</label>
-    <input id="upPin" type="password" autocomplete="off" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20" value="${esc(sessionStorage.getItem('kdz_pin') || '')}">
-    <label class="text-xs text-white/70">Album</label>
-    <select id="upAlbum" class="w-full mb-2 px-3 py-2 rounded-lg bg-navy border border-white/20">
-      <option value="">No album</option>
-      ${albums.map(a => `<option value="${esc(a)}" ${a === pre ? 'selected' : ''}>${esc(a)}</option>`).join('')}
-      <option value="__new__">+ New album...</option>
-    </select>
-    <input id="upNewAlbum" type="text" maxlength="40" placeholder="New album name (example: Game Day)" class="hidden w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20">
-    <label class="text-xs text-white/70 mt-1 block">Your name (optional)</label>
-    <input id="upName" type="text" maxlength="60" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20" value="${esc(localStorage.getItem('kdz_name') || '')}">
-    <label class="text-xs text-white/70">Caption (optional)</label>
-    <input id="upCap" type="text" maxlength="200" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20">
-    <input id="upFile" type="file" accept="${isVid ? 'video/*' : 'image/*'}" ${isVid ? '' : 'multiple'} class="w-full mb-3 text-sm">
-    <div id="upMsg" class="text-sm min-h-[20px] mb-3"></div>
+    <input id="pmPin" type="password" autocomplete="off" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20" value="${esc(sessionStorage.getItem('kdz_pin') || '')}">
+    ${bodyHTML}
+    <div id="pmMsg" class="text-sm min-h-[20px] mb-3"></div>
     <div class="grid grid-cols-2 gap-3">
-      <button id="upCancel" class="border-2 border-white font-display text-xl py-2 rounded-xl">Cancel</button>
-      <button id="upGo" class="bg-orange font-display text-xl py-2 rounded-xl">Upload</button>
+      <button id="pmCancel" class="border-2 border-white font-display text-xl py-2 rounded-xl">Cancel</button>
+      <button id="pmOk" class="bg-orange font-display text-xl py-2 rounded-xl">${okLabel}</button>
     </div>
   </div>`;
   m.classList.remove('hidden'); m.classList.add('flex');
-  const msg = t => { document.getElementById('upMsg').textContent = t; };
+  const msg = t => { document.getElementById('pmMsg').textContent = t; };
   const close = () => { m.classList.add('hidden'); m.classList.remove('flex'); };
-  const sel = document.getElementById('upAlbum'), newBox = document.getElementById('upNewAlbum');
-  sel.onchange = () => {
-    newBox.classList.toggle('hidden', sel.value !== '__new__');
-    if (sel.value === '__new__') newBox.focus();
-  };
-  if (startNewAlbum) { sel.value = '__new__'; newBox.classList.remove('hidden'); newBox.focus(); }
-  document.getElementById('upCancel').onclick = close;
-  document.getElementById('upGo').onclick = async () => {
-    const pin = document.getElementById('upPin').value.trim();
-    const name = document.getElementById('upName').value.trim();
-    const cap = document.getElementById('upCap').value.trim();
-    const files = Array.from(document.getElementById('upFile').files || []);
-    const album = sel.value === '__new__' ? newBox.value.trim() : sel.value;
+  document.getElementById('pmCancel').onclick = close;
+  if (after) after();
+  document.getElementById('pmOk').onclick = async () => {
+    const pin = document.getElementById('pmPin').value.trim();
     if (!pin) return msg('Enter the team PIN.');
-    if (sel.value === '__new__' && !album) return msg('Type a name for the new album.');
-    if (!files.length) return msg('Choose a file first.');
-    if (isVid && files[0].size > MAX_VIDEO_MB * 1048576) return msg(`Video is over ${MAX_VIDEO_MB} MB. Trim it or pick a shorter one.`);
-    const btn = document.getElementById('upGo'); btn.disabled = true; btn.classList.add('opacity-50');
+    const btn = document.getElementById('pmOk'); btn.disabled = true; btn.classList.add('opacity-50');
     try {
-      for (let i = 0; i < files.length; i++) {
-        msg(`Uploading ${i + 1} of ${files.length}...`);
-        await uploadOne(kind, files[i], pin, name, cap, album);
-      }
+      await onOk(pin);
       sessionStorage.setItem('kdz_pin', pin);
-      if (name) localStorage.setItem('kdz_name', name);
-      galleryAlbum = album || '__all__';
       close(); renderGallery();
     } catch (e) {
-      msg(e.message || 'Upload failed.');
+      msg(e.message || 'Something went wrong.');
       btn.disabled = false; btn.classList.remove('opacity-50');
     }
   };
 }
 
+// Album dropdown (existing albums + "New album...") used by several popups
+function albumPickerHTML(albums, pre, noneLabel) {
+  return `<label class="text-xs text-white/70">Album</label>
+  <select id="pmAlbum" class="w-full mb-2 px-3 py-2 rounded-lg bg-navy border border-white/20">
+    <option value="">${esc(noneLabel)}</option>
+    ${albums.map(a => `<option value="${esc(a)}" ${a === pre ? 'selected' : ''}>${esc(a)}</option>`).join('')}
+    <option value="__new__">+ New album...</option>
+  </select>
+  <input id="pmNewAlbum" type="text" maxlength="40" placeholder="New album name" class="hidden w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20">`;
+}
+function wirePicker() {
+  const sel = document.getElementById('pmAlbum'), nb = document.getElementById('pmNewAlbum');
+  sel.onchange = () => { nb.classList.toggle('hidden', sel.value !== '__new__'); if (sel.value === '__new__') nb.focus(); };
+}
+function readPicker() {
+  const sel = document.getElementById('pmAlbum'), nb = document.getElementById('pmNewAlbum');
+  if (sel.value === '__new__') {
+    const v = nb.value.trim();
+    if (!v) throw new Error('Type a name for the new album.');
+    return v;
+  }
+  return sel.value;
+}
+
+// ---- Gallery actions ----
+function newAlbumPopup() {
+  pinModal('NEW <span class="text-orange">ALBUM</span>',
+    `<label class="text-xs text-white/70">Album name</label>
+     <input id="pmName" type="text" maxlength="40" placeholder="Example: Game Day" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20">`,
+    'Create',
+    async pin => {
+      const name = document.getElementById('pmName').value.trim();
+      if (!name) throw new Error('Type an album name.');
+      await adminCall({ action: 'create_album', pin, name });
+      galleryAlbum = name;
+    });
+}
+
+function movePopup(ids, preAlbum) {
+  pinModal(`MOVE <span class="text-orange">${ids.length} ITEM${ids.length > 1 ? 'S' : ''}</span>`,
+    albumPickerHTML(allAlbums, preAlbum || '', 'No album (Unsorted)'),
+    'Move',
+    async pin => {
+      const album = readPicker();
+      await adminCall({ action: 'move', pin, ids, album });
+      selected.clear(); selectMode = false;
+      galleryAlbum = album || '__all__';
+    }, wirePicker);
+}
+
+function deletePopup(ids) {
+  pinModal('DELETE', `<p class="text-sm text-white/80 mb-3">Delete ${ids.length} item${ids.length > 1 ? 's' : ''} permanently? This cannot be undone.</p>`,
+    'Delete',
+    async pin => {
+      await adminCall({ action: 'delete', pin, ids });
+      selected.clear(); selectMode = false;
+      closeLightbox();
+    });
+}
+
+function editPopup(p) {
+  pinModal('EDIT <span class="text-orange">ITEM</span>',
+    `<label class="text-xs text-white/70">Caption</label>
+     <input id="pmCap" type="text" maxlength="200" value="${esc(p.caption || '')}" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20">
+     ${albumPickerHTML(allAlbums, p.album || '', 'No album (Unsorted)')}`,
+    'Save',
+    async pin => {
+      const caption = document.getElementById('pmCap').value.trim();
+      const album = readPicker();
+      await adminCall({ action: 'update', pin, id: p.id, caption });
+      if ((album || null) !== (p.album || null)) await adminCall({ action: 'move', pin, ids: [p.id], album });
+      closeLightbox();
+    }, wirePicker);
+}
+
+function renameAlbumPopup(name) {
+  pinModal('RENAME <span class="text-orange">ALBUM</span>',
+    `<label class="text-xs text-white/70">New name</label>
+     <input id="pmName" type="text" maxlength="40" value="${esc(name)}" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20">`,
+    'Rename',
+    async pin => {
+      const to = document.getElementById('pmName').value.trim();
+      if (!to) throw new Error('Type a name.');
+      await adminCall({ action: 'rename_album', pin, from: name, to });
+      galleryAlbum = to;
+    });
+}
+
+function deleteAlbumPopup(name) {
+  pinModal('DELETE <span class="text-orange">ALBUM</span>',
+    `<p class="text-sm text-white/80 mb-3">Delete the album "${esc(name)}"? The photos stay and move to Unsorted.</p>`,
+    'Delete album',
+    async pin => {
+      await adminCall({ action: 'delete_album', pin, name });
+      galleryAlbum = '__all__';
+    });
+}
+
+function closeLightbox() {
+  const lb = document.getElementById('lb'), vid = document.getElementById('lbVid');
+  if (!lb) return;
+  if (vid) { vid.pause(); vid.removeAttribute('src'); }
+  lb.classList.add('hidden'); lb.classList.remove('flex');
+}
+
+async function uploadOne(kind, file, pin, name, caption, album) {
+  let blob = file, ext = (file.name.split('.').pop() || '').toLowerCase(), type = file.type;
+  if (kind === 'photo') ({ blob, ext, type } = await prepPhoto(file));
+  const s = await adminCall({ action: 'sign', kind, pin, ext });
+  const up = await db.storage.from('photos').uploadToSignedUrl(s.path, s.token, blob, { contentType: type });
+  if (up.error) throw new Error(up.error.message);
+  await adminCall({ action: 'commit', kind, pin, path: s.path, caption, name, album });
+}
+
+async function openUpload(kind) {
+  const isVid = kind === 'video';
+  const pre = (galleryAlbum !== '__all__' && galleryAlbum !== '__none__') ? galleryAlbum : '';
+  pinModal(`ADD <span class="text-orange">${isVid ? 'VIDEO' : 'PHOTOS'}</span>`,
+    `${albumPickerHTML(allAlbums, pre, 'No album')}
+     <label class="text-xs text-white/70 mt-1 block">Your name (optional)</label>
+     <input id="upName" type="text" maxlength="60" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20" value="${esc(localStorage.getItem('kdz_name') || '')}">
+     <label class="text-xs text-white/70">Caption (optional)</label>
+     <input id="upCap" type="text" maxlength="200" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20">
+     <input id="upFile" type="file" accept="${isVid ? 'video/*' : 'image/*'}" ${isVid ? '' : 'multiple'} class="w-full mb-3 text-sm">`,
+    'Upload',
+    async pin => {
+      const album = readPicker();
+      const name = document.getElementById('upName').value.trim();
+      const cap = document.getElementById('upCap').value.trim();
+      const files = Array.from(document.getElementById('upFile').files || []);
+      if (!files.length) throw new Error('Choose a file first.');
+      if (isVid && files[0].size > MAX_VIDEO_MB * 1048576) throw new Error(`Video is over ${MAX_VIDEO_MB} MB. Trim it or pick a shorter one.`);
+      for (let i = 0; i < files.length; i++) {
+        document.getElementById('pmMsg').textContent = `Uploading ${i + 1} of ${files.length}...`;
+        await uploadOne(kind, files[i], pin, name, cap, album);
+      }
+      if (name) localStorage.setItem('kdz_name', name);
+      galleryAlbum = album || '__all__';
+    }, wirePicker);
+}
+
 async function renderGallery() {
   if (COMING_SOON.gallery) return renderSoon('GALLERY', 'Team photos are on the way. Check back soon.');
   app.innerHTML = `
-  <div class="px-4 py-6">
+  <div class="px-4 py-6 pb-28">
     <h2 class="font-display text-5xl mb-4">THE <span class="text-orange">GALLERY</span></h2>
     <div class="grid grid-cols-2 gap-3 mb-4">
       <button id="addPhoto" class="bg-orange font-display text-2xl py-3 rounded-xl active:scale-95 transition">+ Add Photo</button>
@@ -789,33 +897,69 @@ async function renderGallery() {
       <div id="typeTabs" class="flex gap-1"></div>
       <div id="sizeTabs" class="flex items-center gap-1"></div>
     </div>
-    <div id="albumChips" class="flex flex-wrap gap-2 mb-4"></div>
+    <div id="albumChips" class="flex flex-wrap gap-2 mb-3"></div>
+    <div class="flex items-center justify-between gap-2 mb-4">
+      <button id="selectBtn" class="px-3 py-1 rounded-lg font-display text-lg border border-white/40">Select</button>
+      <div id="albumTools" class="flex gap-4 text-sm"></div>
+    </div>
     <div id="list" class="text-white/60">Loading...</div>
   </div>
+  <div id="selBar" class="fixed bottom-0 left-0 right-0 z-[72] hidden items-center gap-2 bg-[#0B1422] border-t-2 border-orange p-3"></div>
   <div id="upModal" class="fixed inset-0 bg-black/80 z-[75] hidden items-center justify-center p-4"></div>
   <div id="lb" class="fixed inset-0 bg-black/90 z-[70] hidden items-center justify-center p-4">
     <button id="lbClose" aria-label="Close" class="absolute top-4 right-5 text-4xl leading-none z-10">&times;</button>
     <figure class="max-w-full max-h-full text-center">
-      <img id="lbImg" class="max-h-[80vh] max-w-full mx-auto rounded-lg hidden" alt="">
-      <video id="lbVid" class="max-h-[80vh] max-w-full mx-auto rounded-lg hidden" controls playsinline></video>
+      <img id="lbImg" class="max-h-[70vh] max-w-full mx-auto rounded-lg hidden" alt="">
+      <video id="lbVid" class="max-h-[70vh] max-w-full mx-auto rounded-lg hidden" controls playsinline></video>
       <figcaption id="lbCap" class="mt-3 text-sm text-white/80"></figcaption>
+      <div id="lbActions" class="mt-3 flex gap-2 justify-center">
+        <button id="lbMove" class="px-4 py-1 rounded-lg font-display text-lg bg-white/10">Move</button>
+        <button id="lbEdit" class="px-4 py-1 rounded-lg font-display text-lg bg-white/10">Edit</button>
+        <button id="lbDelete" class="px-4 py-1 rounded-lg font-display text-lg bg-white/10 text-orange">Delete</button>
+      </div>
     </figure>
   </div>`;
   document.getElementById('addPhoto').onclick = () => openUpload('photo');
   document.getElementById('addVideo').onclick = () => openUpload('video');
 
   const list = document.getElementById('list');
-  const { data, error } = await db.from('gallery_photos').select('*')
-    .order('sort_order', { ascending: true }).order('created_at', { ascending: false });
+  const [pr, ar] = await Promise.all([
+    db.from('gallery_photos').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
+    db.from('gallery_albums').select('name')
+  ]);
   if (!document.getElementById('list')) return;
-  if (error) { list.textContent = 'Could not load photos: ' + error.message; return; }
+  if (pr.error) { list.textContent = 'Could not load photos: ' + pr.error.message; return; }
+  const data = pr.data || [];
+  allAlbums = [...new Set([...(ar.data || []).map(a => a.name), ...data.map(p => p.album)].filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
 
   const lb = document.getElementById('lb'), img = document.getElementById('lbImg'), vid = document.getElementById('lbVid');
-  const close = () => { vid.pause(); vid.removeAttribute('src'); lb.classList.add('hidden'); lb.classList.remove('flex'); };
-  lb.onclick = e => { if (e.target.id !== 'lbImg' && e.target.id !== 'lbVid') close(); };
-  document.getElementById('lbClose').onclick = close;
+  lb.onclick = e => { if (e.target.id !== 'lbImg' && e.target.id !== 'lbVid' && !e.target.closest('#lbActions')) closeLightbox(); };
+  document.getElementById('lbClose').onclick = closeLightbox;
+  let current = null;
+  document.getElementById('lbMove').onclick = () => current && movePopup([current.id], current.album);
+  document.getElementById('lbEdit').onclick = () => current && editPopup(current);
+  document.getElementById('lbDelete').onclick = () => current && deletePopup([current.id]);
 
   const tabCls = on => `px-3 py-1 rounded-lg font-display text-lg ${on ? 'bg-orange' : 'bg-white/10'}`;
+  let shown = [];
+
+  function updateBar() {
+    const bar = document.getElementById('selBar');
+    if (!bar) return;
+    const sb = document.getElementById('selectBtn');
+    sb.textContent = selectMode ? 'Done' : 'Select';
+    sb.className = 'px-3 py-1 rounded-lg font-display text-lg border ' + (selectMode ? 'border-orange text-orange' : 'border-white/40');
+    if (!selectMode) { bar.classList.add('hidden'); bar.classList.remove('flex'); return; }
+    bar.classList.remove('hidden'); bar.classList.add('flex');
+    bar.innerHTML = `<span class="text-sm flex-1">${selected.size} selected</span>
+      <button id="selAll" class="px-3 py-1 rounded-lg font-display text-lg bg-white/10">All</button>
+      <button id="selMove" class="px-3 py-1 rounded-lg font-display text-lg bg-orange ${selected.size ? '' : 'opacity-40'}">Move</button>
+      <button id="selDel" class="px-3 py-1 rounded-lg font-display text-lg bg-white/10 text-orange ${selected.size ? '' : 'opacity-40'}">Delete</button>`;
+    document.getElementById('selAll').onclick = () => { shown.forEach(p => selected.add(p.id)); draw(); };
+    document.getElementById('selMove').onclick = () => { if (selected.size) movePopup([...selected]); };
+    document.getElementById('selDel').onclick = () => { if (selected.size) deletePopup([...selected]); };
+  }
 
   function draw() {
     if (!document.getElementById('list')) return;
@@ -835,41 +979,68 @@ async function renderGallery() {
     });
 
     // Album chips (with counts) + New Album button
-    const albums = [...new Set(data.map(p => p.album).filter(Boolean))].sort((a, b) => a.localeCompare(b));
     const hasUnsorted = data.some(p => !p.album);
     const count = f => data.filter(f).length;
     const chips = [{ key: '__all__', label: `All (${data.length})` },
-      ...albums.map(a => ({ key: a, label: `${a} (${count(p => p.album === a)})` })),
-      ...(albums.length && hasUnsorted ? [{ key: '__none__', label: `Unsorted (${count(p => !p.album)})` }] : [])];
+      ...allAlbums.map(a => ({ key: a, label: `${a} (${count(p => p.album === a)})` })),
+      ...(allAlbums.length && hasUnsorted ? [{ key: '__none__', label: `Unsorted (${count(p => !p.album)})` }] : [])];
     if (!chips.some(c => c.key === galleryAlbum)) galleryAlbum = '__all__';
     const chipBox = document.getElementById('albumChips');
     chipBox.innerHTML = chips.map((c, i) =>
       `<button data-c="${i}" class="px-3 py-1 rounded-lg font-display text-lg ${c.key === galleryAlbum ? 'bg-orange' : 'bg-white/10'}">${esc(c.label)}</button>`).join('') +
       `<button id="newAlbumBtn" class="px-3 py-1 rounded-lg font-display text-lg border border-orange text-orange">+ New Album</button>`;
     chipBox.querySelectorAll('button[data-c]').forEach(b => b.onclick = () => { galleryAlbum = chips[Number(b.dataset.c)].key; draw(); });
-    document.getElementById('newAlbumBtn').onclick = () => openUpload('photo', true);
+    document.getElementById('newAlbumBtn').onclick = newAlbumPopup;
+
+    // Rename / delete the selected album
+    const tools = document.getElementById('albumTools');
+    const real = galleryAlbum !== '__all__' && galleryAlbum !== '__none__';
+    tools.innerHTML = real
+      ? `<button id="renAlbum" class="text-orange underline">Rename album</button><button id="delAlbum" class="text-white/60 underline">Delete album</button>`
+      : '';
+    if (real) {
+      document.getElementById('renAlbum').onclick = () => renameAlbumPopup(galleryAlbum);
+      document.getElementById('delAlbum').onclick = () => deleteAlbumPopup(galleryAlbum);
+    }
+    document.getElementById('selectBtn').onclick = () => { selectMode = !selectMode; if (!selectMode) selected.clear(); draw(); };
 
     // Filtered grid
-    const shown = data.filter(p =>
+    shown = data.filter(p =>
       (galleryAlbum === '__all__' ? true : galleryAlbum === '__none__' ? !p.album : p.album === galleryAlbum) &&
       (galleryType === 'all' ? true : (p.media_type || 'photo') === galleryType));
+    updateBar();
     if (!shown.length) {
       list.className = 'text-white/60';
-      list.textContent = data.length ? 'Nothing matches this filter.' : 'Nothing here yet. Be the first to add a photo!';
+      list.textContent = data.length
+        ? (real ? 'This album is empty. Tap Select, pick photos, then Move to add them here.' : 'Nothing matches this filter.')
+        : 'Nothing here yet. Be the first to add a photo!';
       return;
     }
     list.className = 'ggrid ' + gallerySize;
     const playCls = gallerySize === 's' ? 'text-xl' : 'text-4xl';
     list.innerHTML = shown.map((p, i) => {
       const url = esc(photoUrl(p.image_path));
+      const on = selected.has(p.id);
       const inner = p.media_type === 'video'
         ? `<video src="${url}#t=0.1" muted playsinline preload="metadata" class="w-full h-full object-cover pointer-events-none"></video>
            <span class="absolute inset-0 flex items-center justify-center ${playCls} text-white drop-shadow pointer-events-none">&#9654;</span>`
         : `<img src="${url}" alt="${esc(p.caption || 'Team photo')}" loading="lazy" class="w-full h-full object-cover">`;
-      return `<button data-i="${i}" class="relative block overflow-hidden rounded-lg border border-white/10 bg-[#16253B] aspect-square">${inner}</button>`;
+      return `<button data-i="${i}" class="gitem relative block overflow-hidden rounded-lg border border-white/10 bg-[#16253B] aspect-square ${on ? 'sel' : ''}">${inner}${on ? '<span class="gcheck">&#10003;</span>' : ''}</button>`;
     }).join('');
     list.querySelectorAll('button').forEach(b => b.onclick = () => {
-      const p = shown[Number(b.dataset.i)], url = photoUrl(p.image_path);
+      const p = shown[Number(b.dataset.i)];
+      if (selectMode) {
+        if (selected.has(p.id)) selected.delete(p.id); else selected.add(p.id);
+        const on = selected.has(p.id);
+        b.classList.toggle('sel', on);
+        const chk = b.querySelector('.gcheck');
+        if (on && !chk) b.insertAdjacentHTML('beforeend', '<span class="gcheck">&#10003;</span>');
+        if (!on && chk) chk.remove();
+        updateBar();
+        return;
+      }
+      current = p;
+      const url = photoUrl(p.image_path);
       img.classList.add('hidden'); vid.classList.add('hidden');
       if (p.media_type === 'video') { vid.src = url; vid.classList.remove('hidden'); }
       else { img.src = url; img.classList.remove('hidden'); }
