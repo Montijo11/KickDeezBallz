@@ -686,7 +686,9 @@ async function prepPhoto(file) {
   return { blob: file, ext, type: file.type || 'image/jpeg' };
 }
 
-async function uploadOne(kind, file, pin, name, caption) {
+let galleryAlbum = '__all__';
+
+async function uploadOne(kind, file, pin, name, caption, album) {
   let blob = file, ext = (file.name.split('.').pop() || '').toLowerCase(), type = file.type;
   if (kind === 'photo') ({ blob, ext, type } = await prepPhoto(file));
   const s = await db.functions.invoke(UPLOAD_FN, { body: { action: 'sign', kind, pin, ext } });
@@ -694,20 +696,33 @@ async function uploadOne(kind, file, pin, name, caption) {
   if (!s.data?.ok) throw new Error(s.data?.error || 'Upload not allowed');
   const up = await db.storage.from('photos').uploadToSignedUrl(s.data.path, s.data.token, blob, { contentType: type });
   if (up.error) throw new Error(up.error.message);
-  const c = await db.functions.invoke(UPLOAD_FN, { body: { action: 'commit', kind, pin, path: s.data.path, caption, name } });
+  const c = await db.functions.invoke(UPLOAD_FN, { body: { action: 'commit', kind, pin, path: s.data.path, caption, name, album } });
   if (c.error) throw new Error(c.error.message);
   if (!c.data?.ok) throw new Error(c.data?.error || 'Could not save');
 }
 
-function openUpload(kind) {
+async function openUpload(kind) {
   const m = document.getElementById('upModal');
   const isVid = kind === 'video';
+  let albums = [];
+  try {
+    const r = await db.from('gallery_photos').select('album');
+    albums = [...new Set((r.data || []).map(x => x.album).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  } catch (e) {}
+  const pre = (galleryAlbum !== '__all__' && galleryAlbum !== '__none__') ? galleryAlbum : '';
   m.innerHTML = `
-  <div class="card w-full max-w-sm p-5">
+  <div class="card w-full max-w-sm p-5 max-h-[90vh] overflow-y-auto">
     <div class="font-display text-3xl mb-3">ADD <span class="text-orange">${isVid ? 'VIDEO' : 'PHOTOS'}</span></div>
     <label class="text-xs text-white/70">Team PIN</label>
     <input id="upPin" type="password" autocomplete="off" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20" value="${esc(sessionStorage.getItem('kdz_pin') || '')}">
-    <label class="text-xs text-white/70">Your name (optional)</label>
+    <label class="text-xs text-white/70">Album</label>
+    <select id="upAlbum" class="w-full mb-2 px-3 py-2 rounded-lg bg-navy border border-white/20">
+      <option value="">No album</option>
+      ${albums.map(a => `<option value="${esc(a)}" ${a === pre ? 'selected' : ''}>${esc(a)}</option>`).join('')}
+      <option value="__new__">+ New album...</option>
+    </select>
+    <input id="upNewAlbum" type="text" maxlength="40" placeholder="New album name" class="hidden w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20">
+    <label class="text-xs text-white/70 mt-1 block">Your name (optional)</label>
     <input id="upName" type="text" maxlength="60" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20" value="${esc(localStorage.getItem('kdz_name') || '')}">
     <label class="text-xs text-white/70">Caption (optional)</label>
     <input id="upCap" type="text" maxlength="200" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20">
@@ -721,23 +736,28 @@ function openUpload(kind) {
   m.classList.remove('hidden'); m.classList.add('flex');
   const msg = t => { document.getElementById('upMsg').textContent = t; };
   const close = () => { m.classList.add('hidden'); m.classList.remove('flex'); };
+  const sel = document.getElementById('upAlbum'), newBox = document.getElementById('upNewAlbum');
+  sel.onchange = () => newBox.classList.toggle('hidden', sel.value !== '__new__');
   document.getElementById('upCancel').onclick = close;
   document.getElementById('upGo').onclick = async () => {
     const pin = document.getElementById('upPin').value.trim();
     const name = document.getElementById('upName').value.trim();
     const cap = document.getElementById('upCap').value.trim();
     const files = Array.from(document.getElementById('upFile').files || []);
+    const album = sel.value === '__new__' ? newBox.value.trim() : sel.value;
     if (!pin) return msg('Enter the team PIN.');
+    if (sel.value === '__new__' && !album) return msg('Type a name for the new album.');
     if (!files.length) return msg('Choose a file first.');
     if (isVid && files[0].size > MAX_VIDEO_MB * 1048576) return msg(`Video is over ${MAX_VIDEO_MB} MB. Trim it or pick a shorter one.`);
     const btn = document.getElementById('upGo'); btn.disabled = true; btn.classList.add('opacity-50');
     try {
       for (let i = 0; i < files.length; i++) {
         msg(`Uploading ${i + 1} of ${files.length}...`);
-        await uploadOne(kind, files[i], pin, name, cap);
+        await uploadOne(kind, files[i], pin, name, cap, album);
       }
       sessionStorage.setItem('kdz_pin', pin);
       if (name) localStorage.setItem('kdz_name', name);
+      galleryAlbum = album || '__all__';
       close(); renderGallery();
     } catch (e) {
       msg(e.message || 'Upload failed.');
@@ -755,6 +775,7 @@ async function renderGallery() {
       <button id="addPhoto" class="bg-orange font-display text-2xl py-3 rounded-xl active:scale-95 transition">+ Add Photo</button>
       <button id="addVideo" class="border-2 border-white font-display text-2xl py-3 rounded-xl active:scale-95 transition">+ Add Video</button>
     </div>
+    <div id="albumChips" class="flex flex-wrap gap-2 mb-4"></div>
     <div id="list" class="text-white/60">Loading...</div>
   </div>
   <div id="upModal" class="fixed inset-0 bg-black/80 z-[75] hidden items-center justify-center p-4"></div>
@@ -775,29 +796,48 @@ async function renderGallery() {
   if (!document.getElementById('list')) return;
   if (error) { list.textContent = 'Could not load photos: ' + error.message; return; }
   if (!data.length) { list.textContent = 'Nothing here yet. Be the first to add a photo!'; return; }
-  list.className = 'grid grid-cols-2 gap-2';
-  list.innerHTML = data.map((p, i) => {
-    const url = esc(photoUrl(p.image_path));
-    const inner = p.media_type === 'video'
-      ? `<video src="${url}#t=0.1" muted playsinline preload="metadata" class="w-full h-full object-cover pointer-events-none"></video>
-         <span class="absolute inset-0 flex items-center justify-center text-4xl text-white drop-shadow pointer-events-none">&#9654;</span>`
-      : `<img src="${url}" alt="${esc(p.caption || 'Team photo')}" loading="lazy" class="w-full h-full object-cover">`;
-    return `<button data-i="${i}" class="relative block overflow-hidden rounded-xl border border-white/10 bg-[#16253B] aspect-square">${inner}</button>`;
-  }).join('');
+
+  const albums = [...new Set(data.map(p => p.album).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const hasUnsorted = data.some(p => !p.album);
+  const chips = [{ key: '__all__', label: 'All' }, ...albums.map(a => ({ key: a, label: a })),
+    ...(albums.length && hasUnsorted ? [{ key: '__none__', label: 'Unsorted' }] : [])];
+  if (!chips.some(c => c.key === galleryAlbum)) galleryAlbum = '__all__';
 
   const lb = document.getElementById('lb'), img = document.getElementById('lbImg'), vid = document.getElementById('lbVid');
   const close = () => { vid.pause(); vid.removeAttribute('src'); lb.classList.add('hidden'); lb.classList.remove('flex'); };
-  list.querySelectorAll('button').forEach(b => b.onclick = () => {
-    const p = data[Number(b.dataset.i)], url = photoUrl(p.image_path);
-    img.classList.add('hidden'); vid.classList.add('hidden');
-    if (p.media_type === 'video') { vid.src = url; vid.classList.remove('hidden'); }
-    else { img.src = url; img.classList.remove('hidden'); }
-    const by = p.uploaded_by ? ` (${p.uploaded_by})` : '';
-    document.getElementById('lbCap').textContent = (p.caption || '') + by;
-    lb.classList.remove('hidden'); lb.classList.add('flex');
-  });
   lb.onclick = e => { if (e.target.id !== 'lbImg' && e.target.id !== 'lbVid') close(); };
   document.getElementById('lbClose').onclick = close;
+
+  function draw() {
+    const chipBox = document.getElementById('albumChips');
+    if (!chipBox) return;
+    chipBox.innerHTML = albums.length ? chips.map((c, i) =>
+      `<button data-c="${i}" class="px-3 py-1 rounded-lg font-display text-xl ${c.key === galleryAlbum ? 'bg-orange' : 'bg-white/10'}">${esc(c.label)}</button>`).join('') : '';
+    chipBox.querySelectorAll('button').forEach(b => b.onclick = () => { galleryAlbum = chips[Number(b.dataset.c)].key; draw(); });
+
+    const shown = data.filter(p =>
+      galleryAlbum === '__all__' ? true : galleryAlbum === '__none__' ? !p.album : p.album === galleryAlbum);
+    if (!shown.length) { list.className = 'text-white/60'; list.textContent = 'Nothing in this album yet.'; return; }
+    list.className = 'grid grid-cols-2 gap-2';
+    list.innerHTML = shown.map((p, i) => {
+      const url = esc(photoUrl(p.image_path));
+      const inner = p.media_type === 'video'
+        ? `<video src="${url}#t=0.1" muted playsinline preload="metadata" class="w-full h-full object-cover pointer-events-none"></video>
+           <span class="absolute inset-0 flex items-center justify-center text-4xl text-white drop-shadow pointer-events-none">&#9654;</span>`
+        : `<img src="${url}" alt="${esc(p.caption || 'Team photo')}" loading="lazy" class="w-full h-full object-cover">`;
+      return `<button data-i="${i}" class="relative block overflow-hidden rounded-xl border border-white/10 bg-[#16253B] aspect-square">${inner}</button>`;
+    }).join('');
+    list.querySelectorAll('button').forEach(b => b.onclick = () => {
+      const p = shown[Number(b.dataset.i)], url = photoUrl(p.image_path);
+      img.classList.add('hidden'); vid.classList.add('hidden');
+      if (p.media_type === 'video') { vid.src = url; vid.classList.remove('hidden'); }
+      else { img.src = url; img.classList.remove('hidden'); }
+      const by = p.uploaded_by ? ` (${p.uploaded_by})` : '';
+      document.getElementById('lbCap').textContent = (p.caption || '') + by;
+      lb.classList.remove('hidden'); lb.classList.add('flex');
+    });
+  }
+  draw();
 }
 
 async function renderMerch() {
