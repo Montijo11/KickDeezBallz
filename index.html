@@ -132,11 +132,11 @@
   <button id="closeBtn" aria-label="Close menu" class="absolute top-4 right-4 text-3xl leading-none">&times;</button>
   <div class="font-display text-4xl mt-8 mb-8">KICK <span class="text-orange">DEEZ</span> BALLZ</div>
   <a href="#/" class="navlink block py-3 font-display text-3xl border-b border-white/10">Home</a>
-  <a href="#/schedule" class="navlink block py-3 font-display text-3xl border-b border-white/10">Schedule</a>
+  <a href="#/schedule" class="navlink block py-3 font-display text-3xl text-orange border-b border-white/10">Schedule</a>
   <a href="#/standings" class="navlink block py-3 font-display text-3xl border-b border-white/10">Standings</a>
-  <a href="#/roster" class="navlink block py-3 font-display text-3xl border-b border-white/10">Roster</a>
+  <a href="#/roster" class="navlink block py-3 font-display text-3xl text-orange border-b border-white/10">Roster</a>
   <a href="#/achievements" class="navlink block py-3 font-display text-3xl border-b border-white/10">Achievements</a>
-  <a href="#/gallery" class="navlink block py-3 font-display text-3xl border-b border-white/10">Gallery<span data-soon="gallery" class="ml-2 align-middle font-body text-[10px] font-bold tracking-widest text-orange border border-orange/60 rounded-full px-2 py-0.5">COMING SOON</span></a>
+  <a href="#/gallery" class="navlink block py-3 font-display text-3xl text-orange border-b border-white/10">Gallery<span data-soon="gallery" class="ml-2 align-middle font-body text-[10px] font-bold tracking-widest text-orange border border-orange/60 rounded-full px-2 py-0.5">COMING SOON</span></a>
   <a href="#/merch" class="navlink block py-3 font-display text-3xl border-b border-white/10">Merch<span data-soon="merch" class="ml-2 align-middle font-body text-[10px] font-bold tracking-widest text-orange border border-orange/60 rounded-full px-2 py-0.5">COMING SOON</span></a>
 </nav>
 
@@ -1054,38 +1054,94 @@ async function renderGallery() {
 }
 
 async function renderMerch() {
-  app.innerHTML = `<div class="px-4 py-6">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="font-display text-5xl">TEAM <span class="text-orange">MERCH</span></h2>
-      <div id="msz" class="flex gap-1">
-        ${['s','m','l'].map(k => `<button data-k="${k}" class="font-display text-xl px-3 py-1 rounded-lg border border-white/30">${k.toUpperCase()}</button>`).join('')}
-      </div>
-    </div>
-    <div id="mgrid" class="ggrid m text-white/60">Loading...</div>
+  const sizeKey = localStorage.getItem('kdz_msize') || gallerySize || 'm';
+  let merchSize = ['s','m','l'].includes(sizeKey) ? sizeKey : 'm';
+
+  app.innerHTML = `
+  <div class="px-4 py-6 pb-10">
+    <h2 class="font-display text-5xl mb-4">TEAM <span class="text-orange">MERCH</span></h2>
+    <div class="flex items-center justify-end gap-1 mb-4" id="mSizeTabs"></div>
+    <div id="mlist" class="text-white/60">Loading...</div>
+  </div>
+  <div id="mlb" class="fixed inset-0 bg-black/90 z-[70] hidden items-center justify-center p-4">
+    <button id="mlbClose" aria-label="Close" class="absolute top-4 right-5 text-4xl leading-none z-10">&times;</button>
+    <button id="mlbPrev" aria-label="Previous" class="absolute left-2 top-1/2 -translate-y-1/2 text-5xl px-2 z-10">&#8249;</button>
+    <button id="mlbNext" aria-label="Next" class="absolute right-2 top-1/2 -translate-y-1/2 text-5xl px-2 z-10">&#8250;</button>
+    <figure class="max-w-full max-h-full text-center">
+      <img id="mlbImg" class="max-h-[60vh] max-w-full mx-auto rounded-lg" alt="">
+      <figcaption id="mlbCap" class="mt-3"></figcaption>
+      <a id="mlbBuy" target="_blank" rel="noopener" class="inline-block mt-4 bg-orange text-white font-display text-2xl px-10 py-3 rounded-xl active:scale-95 transition">BUY NOW</a>
+    </figure>
   </div>`;
 
+  const list = document.getElementById('mlist');
   const { data, error } = await db.from('merch_items').select('*').order('sort_order', { ascending: true });
-  const grid = document.getElementById('mgrid');
-  if (!grid) return;
-  if (error) { grid.textContent = 'Could not load merch: ' + error.message; return; }
-  if (!data.length) { grid.textContent = 'No merch yet.'; return; }
+  if (!document.getElementById('mlist')) return;
+  if (error) { list.textContent = 'Could not load merch: ' + error.message; return; }
+  const items = data || [];
+  if (!items.length) { list.textContent = 'No merch yet.'; return; }
 
-  const items = data.map(it => ({
-    ...it,
-    url: db.storage.from('photos').getPublicUrl(it.image_path).data.publicUrl
-  }));
   const money = n => '$' + Number(n).toFixed(2);
+  const tabCls = on => `px-3 py-1 rounded-lg font-display text-lg ${on ? 'bg-orange' : 'bg-white/10'}`;
+  const lb = document.getElementById('mlb'), lbImg = document.getElementById('mlbImg');
+  const lbCap = document.getElementById('mlbCap'), lbBuy = document.getElementById('mlbBuy');
+  let cur = 0;
 
-  grid.innerHTML = items.map((it, i) => `
-    <button class="gitem relative block w-full text-left" data-i="${i}" aria-label="${esc(it.name)}">
-      <img src="${esc(it.url)}" alt="${esc(it.name)}" loading="lazy" class="w-full aspect-square object-cover rounded-lg">
-      <span class="absolute bottom-1 left-1 bg-navy/85 border border-orange rounded-full px-2 py-0.5 font-display text-lg">${money(it.price)}</span>
-    </button>`).join('');
+  const closeLb = () => { lb.classList.add('hidden'); lb.classList.remove('flex'); };
+  const showItem = i => {
+    cur = (i + items.length) % items.length;
+    const it = items[cur];
+    lbImg.src = photoUrl(it.image_path);
+    lbImg.alt = it.name || 'Team merch';
+    lbCap.innerHTML = `<div class="font-display text-3xl">${esc(it.name)} &middot; <span class="text-orange">${money(it.price)}</span></div>` +
+      (it.description ? `<p class="text-sm text-white/70 mt-1 max-w-sm mx-auto">${esc(it.description)}</p>` : '');
+    const href = safeUrl(it.buy_url);
+    lbBuy.classList.toggle('hidden', !href);
+    if (href) lbBuy.href = href;
+    lb.classList.remove('hidden'); lb.classList.add('flex');
+  };
 
-  document.getElementById('msz').addEventListener('click', e => {
-    const k = e.target.dataset.k; if (!k) return;
-    grid.className = 'ggrid ' + k;
+  lb.onclick = e => { if (e.target === lb) closeLb(); };
+  document.getElementById('mlbClose').onclick = closeLb;
+  document.getElementById('mlbPrev').onclick = () => showItem(cur - 1);
+  document.getElementById('mlbNext').onclick = () => showItem(cur + 1);
+
+  let sx = null;
+  lb.addEventListener('touchstart', e => { sx = e.touches[0].clientX; }, { passive: true });
+  lb.addEventListener('touchend', e => {
+    if (sx === null) return;
+    const dx = e.changedTouches[0].clientX - sx; sx = null;
+    if (Math.abs(dx) > 50) showItem(cur + (dx < 0 ? 1 : -1));
   });
+
+  function draw() {
+    const box = document.getElementById('mSizeTabs');
+    if (!box) return;
+    box.innerHTML = '<span class="text-[11px] text-white/50 mr-1">Size</span>' +
+      [['s','S'],['m','M'],['l','L']].map(([k, l]) => `<button data-z="${k}" class="${tabCls(k === merchSize)}">${l}</button>`).join('');
+    box.querySelectorAll('button').forEach(b => b.onclick = () => {
+      merchSize = b.dataset.z; localStorage.setItem('kdz_msize', merchSize); draw();
+    });
+
+    list.className = 'ggrid ' + merchSize;
+    const priceCls = merchSize === 's' ? 'text-sm' : 'text-xl';
+    list.innerHTML = items.map((it, i) => `
+      <button data-i="${i}" class="gitem relative block overflow-hidden rounded-lg border border-white/10 bg-[#16253B] aspect-square" aria-label="${esc(it.name)}">
+        <img src="${esc(photoUrl(it.image_path))}" alt="${esc(it.name)}" loading="lazy" class="w-full h-full object-cover">
+        <span class="absolute bottom-1 left-1 bg-navy/85 border border-orange rounded-full px-2 py-0.5 font-display ${priceCls} leading-none">${money(it.price)}</span>
+      </button>`).join('');
+    list.querySelectorAll('button').forEach(b => b.onclick = () => showItem(Number(b.dataset.i)));
+  }
+  draw();
+
+  document.addEventListener('keydown', function k(e) {
+    if (!document.getElementById('mlb')) return document.removeEventListener('keydown', k);
+    if (lb.classList.contains('hidden')) return;
+    if (e.key === 'Escape') closeLb();
+    if (e.key === 'ArrowLeft') showItem(cur - 1);
+    if (e.key === 'ArrowRight') showItem(cur + 1);
+  });
+}
 
   let cur = 0;
   const box = document.createElement('div');
