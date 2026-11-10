@@ -647,7 +647,7 @@ async function renderAchievements() {
 
 /* ---------- Photos, Gallery, Merch ---------- */
 // Set a section to false to launch it. The menu badge disappears and the real page opens.
-const COMING_SOON = { gallery: true, merch: true };
+const COMING_SOON = { gallery: false, merch: true };
 document.querySelectorAll('[data-soon]').forEach(el => { if (!COMING_SOON[el.dataset.soon]) el.remove(); });
 
 function renderSoon(word, blurb) {
