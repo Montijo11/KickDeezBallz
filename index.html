@@ -256,42 +256,48 @@ overlay.onclick = closeMenu;
 document.querySelectorAll('.navlink').forEach(a => a.addEventListener('click', closeMenu));
 
 /* ---------- Game-day lineup ---------- */
-function lineupHTML(lu) {
-  const field = lu.fielding || [], bat = lu.batting || [];
+function lineupHTML(lu, season) {
+  const rows = lu.lineup_players || [];
   const n = lu.innings || 6;
-  const pink = Object.fromEntries(field.map(f => [f.name, !!f.pink]));
-  const bg = name => pink[name] ? '#F8B8D8' : '#BFE0FF';
-  const cell = p => p === 'B'
+  const bg = p => p.gender === 'F' ? '#F8B8D8' : '#BFE0FF';
+  const bat = rows.filter(p => p.bat_order != null).sort((a, b) => a.bat_order - b.bat_order);
+  const field = rows.slice().sort((a, b) => (a.field_order ?? 99) - (b.field_order ?? 99));
+  const cell = pos => pos === 'B'
     ? `<td class="border border-white/10 py-1 font-bold" style="background:#FFD34D;color:#101C2E">B</td>`
-    : `<td class="border border-white/10 py-1 font-bold">${esc(p)}</td>`;
+    : `<td class="border border-white/10 py-1 font-bold">${esc(pos || '-')}</td>`;
   return `
-  <div class="card p-4 mt-5">
-    <div class="flex items-center justify-between mb-3">
+  <div class="neon rise mt-5" style="animation-delay:.7s"><div class="in p-5">
+    <div class="flex items-center justify-between mb-4">
       <span class="font-display text-2xl tracking-widest text-orange">LINEUP</span>
-      <span class="text-[11px] text-white/70">${esc(lu.title || '')}</span>
+      <span class="text-[11px] text-white/60 text-right">Season ${esc(season)}</span>
     </div>
-    <div class="font-display text-xl mb-2">Batting order</div>
-    <ol class="space-y-1 mb-5">
-      ${bat.map((name, i) => `<li class="flex items-center gap-2 rounded-lg px-2 py-1" style="background:${bg(name)};color:#101C2E">
-        <span class="font-display text-xl w-7">${i + 1}</span><span class="font-bold">${esc(name)}</span></li>`).join('')}
+    ${lu.title ? `<div class="text-center mb-4"><span class="round" style="font-size:30px;padding:6px 22px">${esc(lu.title)}</span></div>` : ''}
+
+    <div class="font-display text-2xl text-center mb-3">BATTING ORDER</div>
+    <ol class="space-y-2 mb-6">
+      ${bat.map(p => `<li class="flex items-center gap-3 rounded-xl px-3 py-2" style="background:${bg(p)};color:#101C2E">
+        <span class="font-display text-2xl w-8 text-center">${esc(p.bat_order)}</span>
+        <span class="font-bold text-lg">${esc(p.player_name)}</span></li>`).join('')}
     </ol>
-    <div class="font-display text-xl mb-2">Field positions by inning</div>
+
+    <div class="font-display text-2xl text-center mb-3">FIELD POSITIONS</div>
     <div class="overflow-x-auto">
       <table class="w-full text-center text-sm border-collapse">
         <thead><tr><th class="text-left p-1 text-white/70">Player</th>
-          ${Array.from({ length: n }, (_, i) => `<th class="p-1 text-white/70">${i + 1}</th>`).join('')}</tr></thead>
+          ${Array.from({ length: n }, (_, i) => `<th class="p-1 font-display text-lg text-white/70">${i + 1}</th>`).join('')}</tr></thead>
         <tbody>
-          ${field.map(f => `<tr>
-            <td class="text-left font-bold px-2 py-1 border border-white/10 whitespace-nowrap" style="background:${bg(f.name)};color:#101C2E">${esc(f.name)}</td>
-            ${(f.pos || []).slice(0, n).map(cell).join('')}</tr>`).join('')}
+          ${field.map(p => `<tr>
+            <td class="text-left font-bold px-2 py-1 border border-white/10 whitespace-nowrap" style="background:${bg(p)};color:#101C2E">${esc(p.player_name)}</td>
+            ${Array.from({ length: n }, (_, i) => cell(p['inning_' + (i + 1)])).join('')}</tr>`).join('')}
         </tbody>
       </table>
     </div>
-    <details class="mt-3 text-sm">
+
+    <details class="mt-4 text-sm">
       <summary class="cursor-pointer text-orange font-semibold">Position legend</summary>
       <p class="mt-2 text-white/80 leading-relaxed">1B first base, 2B second base, 3B third base, SS shortstop, C catcher, P pitcher, L left field, LC left center, RC right center, R right field, SR short right, SL short left, B bench.</p>
     </details>
-  </div>`;
+  </div></div>`;
 }
 
 /* ---------- Home ---------- */
@@ -365,10 +371,10 @@ async function renderHome() {
   }
 
   try {
-    const lu = await db.from('game_lineups').select('*')
+    const lu = await db.from('lineups').select('*, lineup_players(*)')
       .eq('season', best.season).eq('game_id', String(g.id)).limit(1);
     if (document.getElementById('nextGame') && lu.data && lu.data[0]) {
-      box.insertAdjacentHTML('beforeend', lineupHTML(lu.data[0]));
+      box.insertAdjacentHTML('beforeend', lineupHTML(lu.data[0], best.season));
     }
   } catch (e) {}
 }
