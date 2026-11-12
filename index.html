@@ -255,11 +255,13 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu();
 overlay.onclick = closeMenu;
 document.querySelectorAll('.navlink').forEach(a => a.addEventListener('click', closeMenu));
 
-/* ---------- Game-day lineup ---------- */
+/* ---------- Game-day lineup (field + inning switcher) ---------- */
+const LU_POS = ['P', 'C', '1B', '2B', '3B', 'SS', 'L', 'SL', 'LC', 'RC', 'SR', 'R'];
+const luBg = p => p.gender === 'F' ? '#F8B8D8' : '#BFE0FF';
+
 function lineupHTML(lu, season) {
   const rows = lu.lineup_players || [];
   const n = lu.innings || 6;
-  const bg = p => p.gender === 'F' ? '#F8B8D8' : '#BFE0FF';
   const bat = rows.filter(p => p.bat_order != null).sort((a, b) => a.bat_order - b.bat_order);
   const field = rows.slice().sort((a, b) => (a.field_order ?? 99) - (b.field_order ?? 99));
   const cell = pos => pos === 'B'
@@ -273,31 +275,80 @@ function lineupHTML(lu, season) {
     </div>
     ${lu.title ? `<div class="text-center mb-4"><span class="round" style="font-size:30px;padding:6px 22px">${esc(lu.title)}</span></div>` : ''}
 
-    <div class="font-display text-2xl text-center mb-3">BATTING ORDER</div>
-    <ol class="space-y-2 mb-6">
-      ${bat.map(p => `<li class="flex items-center gap-3 rounded-xl px-3 py-2" style="background:${bg(p)};color:#101C2E">
+    <div class="font-display text-2xl text-center mb-3">FIELD POSITIONS</div>
+    <div id="luTabs" class="flex flex-wrap items-center justify-center gap-2 mb-3"></div>
+    <div class="field">${fieldSVG()}<div id="luSpots" class="absolute inset-0"></div></div>
+    <div id="luBench" class="text-center text-sm text-white/80 mt-3"></div>
+
+    <div class="font-display text-2xl text-center mt-6 mb-3">BATTING ORDER</div>
+    <ol class="space-y-2 mb-4">
+      ${bat.map(p => `<li class="flex items-center gap-3 rounded-xl px-3 py-2" style="background:${luBg(p)};color:#101C2E">
         <span class="font-display text-2xl w-8 text-center">${esc(p.bat_order)}</span>
         <span class="font-bold text-lg">${esc(p.player_name)}</span></li>`).join('')}
     </ol>
 
-    <div class="font-display text-2xl text-center mb-3">FIELD POSITIONS</div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-center text-sm border-collapse">
-        <thead><tr><th class="text-left p-1 text-white/70">Player</th>
-          ${Array.from({ length: n }, (_, i) => `<th class="p-1 font-display text-lg text-white/70">${i + 1}</th>`).join('')}</tr></thead>
-        <tbody>
-          ${field.map(p => `<tr>
-            <td class="text-left font-bold px-2 py-1 border border-white/10 whitespace-nowrap" style="background:${bg(p)};color:#101C2E">${esc(p.player_name)}</td>
-            ${Array.from({ length: n }, (_, i) => cell(p['inning_' + (i + 1)])).join('')}</tr>`).join('')}
-        </tbody>
-      </table>
-    </div>
-
-    <details class="mt-4 text-sm">
+    <details class="mt-2 text-sm">
+      <summary class="cursor-pointer text-orange font-semibold">Full inning chart</summary>
+      <div class="overflow-x-auto mt-3">
+        <table class="w-full text-center text-sm border-collapse">
+          <thead><tr><th class="text-left p-1 text-white/70">Player</th>
+            ${Array.from({ length: n }, (_, i) => `<th class="p-1 font-display text-lg text-white/70">${i + 1}</th>`).join('')}</tr></thead>
+          <tbody>
+            ${field.map(p => `<tr>
+              <td class="text-left font-bold px-2 py-1 border border-white/10 whitespace-nowrap" style="background:${luBg(p)};color:#101C2E">${esc(p.player_name)}</td>
+              ${Array.from({ length: n }, (_, i) => cell(p['inning_' + (i + 1)])).join('')}</tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </details>
+    <details class="mt-3 text-sm">
       <summary class="cursor-pointer text-orange font-semibold">Position legend</summary>
       <p class="mt-2 text-white/80 leading-relaxed">1B first base, 2B second base, 3B third base, SS shortstop, C catcher, P pitcher, L left field, LC left center, RC right center, R right field, SR short right, SL short left, B bench.</p>
     </details>
   </div></div>`;
+}
+
+function wireLineup(lu) {
+  const rows = lu.lineup_players || [];
+  const n = lu.innings || 6;
+  const tabs = document.getElementById('luTabs');
+  const spots = document.getElementById('luSpots');
+  const benchBox = document.getElementById('luBench');
+  if (!tabs || !spots) return;
+  let inning = 1;
+
+  function draw() {
+    tabs.innerHTML = '<span class="text-xs text-white/70 mr-1">Inning</span>' +
+      Array.from({ length: n }, (_, i) =>
+        `<button data-i="${i + 1}" aria-pressed="${i + 1 === inning}" class="px-4 py-2 rounded-lg font-display text-xl ${i + 1 === inning ? 'bg-orange' : 'bg-white/10'}">${i + 1}</button>`).join('');
+    tabs.querySelectorAll('button').forEach(b => b.onclick = () => { inning = Number(b.dataset.i); draw(); });
+
+    const used = {}, bench = [];
+    let html = '', d = 0;
+    rows.forEach(p => {
+      const pos = String(p['inning_' + inning] || '').trim().toUpperCase();
+      if (pos === 'B') { bench.push(p.player_name); return; }
+      if (!SPOTS[pos]) return;
+      used[pos] = (used[pos] || 0) + 1;
+      const x = SPOTS[pos][0] + (used[pos] - 1) * 24, y = SPOTS[pos][1];
+      const first = String(p.player_name || '').trim().split(/\s+/)[0];
+      html += `<div class="pos" style="left:${(x / 4).toFixed(2)}%;top:${(y / 3.8).toFixed(2)}%">
+        <div class="spot" style="--d:${(d++ * 0.04).toFixed(2)}s" title="${esc(p.player_name)} (${esc(pos)})">
+          <div class="dot" style="background:${luBg(p)};color:#101C2E">${esc(pos)}</div>
+          <div class="lbl" style="max-width:72px">${esc(first)}</div>
+        </div></div>`;
+    });
+    LU_POS.filter(k => !used[k]).forEach(k => {
+      const [x, y] = SPOTS[k];
+      html += `<div class="pos empty" style="left:${(x / 4).toFixed(2)}%;top:${(y / 3.8).toFixed(2)}%">
+        <div class="spot" title="${esc(k)} (open)"><div class="dot">${esc(k)}</div></div></div>`;
+    });
+    spots.innerHTML = html;
+    benchBox.innerHTML = bench.length
+      ? `<span class="font-bold" style="color:#FFD34D">Bench:</span> ${bench.map(esc).join(', ')}`
+      : '';
+  }
+  draw();
 }
 
 /* ---------- Home ---------- */
@@ -375,6 +426,7 @@ async function renderHome() {
       .eq('season', best.season).eq('game_id', String(g.id)).limit(1);
     if (document.getElementById('nextGame') && lu.data && lu.data[0]) {
       box.insertAdjacentHTML('beforeend', lineupHTML(lu.data[0], best.season));
+      wireLineup(lu.data[0]);
     }
   } catch (e) {}
 }
