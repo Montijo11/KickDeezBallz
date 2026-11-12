@@ -114,15 +114,31 @@
   .pop h4 { font-family:'Bebas Neue',sans-serif; font-size:18px; letter-spacing:.1em; color:#E4440C; margin-bottom:4px; }
   .pop li { display:flex; gap:8px; align-items:center; font-size:13px; padding:3px 0; border-top:1px solid rgba(255,255,255,.08); white-space:nowrap; }
   .pop li b { font-family:'Bebas Neue',sans-serif; font-size:18px; color:#E4440C; min-width:34px; }
+
+  /* ---------- Accessibility patch ---------- */
+  html .text-orange { color:#FF6A33; }
+  .text-white\/40, .text-white\/50 { color:rgba(255,255,255,.7); }
+  .lbl, .tile span { font-size:12px; }
+  header.fixed { padding-top:env(safe-area-inset-top); height:calc(4rem + env(safe-area-inset-top)) !important; }
+  main#app { padding-top:calc(4rem + env(safe-area-inset-top)) !important; }
+  #menuBtn, #closeBtn { min-width:48px; min-height:48px; }
+  summary { min-height:48px; display:flex; align-items:center; }
+  @media (prefers-reduced-motion: reduce) {
+    .glow,.streak,.spark,.mainlogo,.neon::before,.vs,.spot,.rise { animation:none !important; }
+    .rise { opacity:1; transform:none; }
+    html { scroll-behavior:auto; }
+  }
 </style>
 </head>
 <body>
+
+<a href="#app" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[80] focus:bg-orange focus:text-white focus:px-4 focus:py-2 focus:rounded-lg">Skip to content</a>
 
 <header class="fixed top-0 left-0 w-full h-16 bg-navy z-50 flex items-center justify-between px-4 border-b border-white/10">
   <a href="#/" class="flex items-center" aria-label="KickDeezBallz Home">
     <img src="KDZ.jpeg" alt="KDZ logo" class="h-11 w-11 rounded-lg object-cover border border-orange/60" onerror="this.style.display='none'">
   </a>
-  <button id="menuBtn" aria-label="Open menu" class="p-2">
+  <button id="menuBtn" aria-label="Open menu" aria-expanded="false" class="p-2">
     <svg width="28" height="28" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M4 8h20M4 14h20M4 20h20"/></svg>
   </button>
 </header>
@@ -231,10 +247,11 @@ async function findActiveGame() {
 
 /* ---------- Drawer ---------- */
 const drawer = document.getElementById('drawer'), overlay = document.getElementById('overlay');
-const openMenu = () => { drawer.classList.remove('translate-x-full'); overlay.classList.remove('hidden'); };
-const closeMenu = () => { drawer.classList.add('translate-x-full'); overlay.classList.add('hidden'); };
+const openMenu = () => { drawer.classList.remove('translate-x-full'); overlay.classList.remove('hidden'); document.getElementById('menuBtn').setAttribute('aria-expanded', 'true'); };
+const closeMenu = () => { drawer.classList.add('translate-x-full'); overlay.classList.add('hidden'); document.getElementById('menuBtn').setAttribute('aria-expanded', 'false'); };
 document.getElementById('menuBtn').onclick = openMenu;
 document.getElementById('closeBtn').onclick = closeMenu;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
 overlay.onclick = closeMenu;
 document.querySelectorAll('.navlink').forEach(a => a.addEventListener('click', closeMenu));
 
@@ -310,6 +327,7 @@ async function renderHome() {
 }
 
 function startCountdown(target) {
+  clearInterval(timer);
   const el = document.getElementById('cd');
   const tile = (n, l) => `<div class="tile"><b>${String(n).padStart(2, '0')}</b><span>${l}</span></div>`;
   const tick = () => {
@@ -465,6 +483,11 @@ async function renderRoster() {
     const s = e.target.closest('.pos.multi');
     fb.querySelectorAll('.pos.open').forEach(x => { if (x !== s) x.classList.remove('open'); });
     if (s) s.classList.toggle('open');
+  });
+  fb.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const s = e.target.closest('.pos.multi'); if (!s) return;
+    e.preventDefault(); s.classList.toggle('open');
   });
 
   list.className = 'space-y-3';
@@ -1148,19 +1171,18 @@ function route() {
   clearInterval(timer);
   window.scrollTo(0, 0);
   const h = location.hash || '#/';
-  if (h === '#/roster') renderRoster();
-  else if (h === '#/schedule') renderSchedule();
-  else if (h === '#/standings') renderStandings();
-  else if (h === '#/achievements') renderAchievements();
-  else if (h === '#/gallery') renderGallery();
-  else if (h === '#/merch') renderMerch();
-  else renderHome();
+  const pages = {
+    '#/roster': [renderRoster, 'Roster'], '#/schedule': [renderSchedule, 'Schedule'],
+    '#/standings': [renderStandings, 'Standings'], '#/achievements': [renderAchievements, 'Achievements'],
+    '#/gallery': [renderGallery, 'Gallery'], '#/merch': [renderMerch, 'Merch']
+  };
+  const [fn, name] = pages[h] || [renderHome, ''];
+  document.title = name ? `${name} | KickDeezBallz` : 'KickDeezBallz';
+  Promise.resolve(fn()).catch(() => {
+    app.innerHTML = '<div class="px-4 py-10 text-center text-white/70">Something went wrong loading this page. Check your connection and try again.</div>';
+  });
 }
 window.addEventListener('hashchange', route);
-
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
-}
 route();
 </script>
 </body>
