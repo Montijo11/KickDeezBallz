@@ -247,26 +247,24 @@ function resultInfo(game, home, away) {
   return { hs, aw, line };
 }
 
-/* ---------- Seasons: tables "Season 1".."Season 7" and "Season 1 Teams".. ---------- */
-const SEASON_NUMS = [1, 2, 3, 4, 5, 6, 7];
-const gamesT = n => `Season ${n}`;
-const teamsT = n => `Season ${n} Teams`;
+/* ---------- Seasons, teams and games (tables: seasons, teams, games; view: standings) ---------- */
+let SEASON_NUMS = [];
+async function loadSeasons() {
+  if (SEASON_NUMS.length) return;
+  const { data } = await db.from('seasons').select('num').order('num', { ascending: true });
+  SEASON_NUMS = (data || []).map(s => s.num);
+}
 
 async function teamMapFor(n) {
-  const { data } = await db.from(teamsT(n)).select('*');
+  const { data } = await db.from('standings').select('*').eq('season', n);
   return Object.fromEntries((data || []).map(t => [t.id, t]));
 }
 
 async function findActiveGame() {
-  const res = await Promise.all(SEASON_NUMS.map(async n => {
-    const r = await db.from(gamesT(n)).select('*').eq('is_active', true)
-      .order('match_at', { ascending: true }).limit(1);
-    return { n, data: r.data, error: r.error };
-  }));
-  const found = res.filter(r => r.data && r.data.length).map(r => ({ season: r.n, game: r.data[0] }));
-  found.sort((a, b) => new Date(a.game.match_at || 0) - new Date(b.game.match_at || 0));
-  const allFailed = res.every(r => r.error);
-  return { best: found[0] || null, error: allFailed ? res[0].error : null };
+  const r = await db.from('games').select('*').eq('is_active', true)
+    .order('match_at', { ascending: true }).limit(1);
+  const g = r.data && r.data[0];
+  return { best: g ? { season: g.season, game: g } : null, error: r.error || null };
 }
 
 /* ---------- Drawer ---------- */
@@ -670,7 +668,7 @@ async function defaultSeason() {
   const saved = Number(sessionStorage.getItem('kdz_season')) || 0;
   if (saved) return saved;
   const { best } = await findActiveGame();
-  return best ? best.season : 7;
+  return best ? best.season : (SEASON_NUMS[SEASON_NUMS.length - 1] || 1);
 }
 
 /* ---------- Schedule (newest game first, so Week 1 is at the bottom) ---------- */
@@ -701,7 +699,7 @@ async function renderSchedule() {
     list.className = 'space-y-3 text-white/60';
     list.textContent = 'Loading...';
     const [g, teams] = await Promise.all([
-      db.from(gamesT(n)).select('*').order('match_at', { ascending: false }),
+      db.from('games').select('*').eq('season', n).order('match_at', { ascending: false }),
       teamMapFor(n)
     ]);
     if (!document.getElementById('list') || my !== reqId) return;
@@ -777,7 +775,7 @@ async function renderStandings() {
     drawChips();
     list.className = 'space-y-3 text-white/60';
     list.textContent = 'Loading...';
-    const { data, error } = await db.from(teamsT(n)).select('*');
+    const { data, error } = await db.from('standings').select('*').eq('season', n);
     if (!document.getElementById('list') || my !== reqId) return;
     if (error) { list.textContent = `Could not load Season ${n}. Please try again.`; return; }
     const teams = (data || []).slice().sort((a, b) =>
@@ -1365,7 +1363,7 @@ function route() {
   };
   const [fn, name] = pages[h] || [renderHome, ''];
   document.title = name ? `${name} | KickDeezBallz` : 'KickDeezBallz';
-  Promise.resolve(fn()).catch(() => {
+  loadSeasons().then(() => fn()).catch(() => {
     app.innerHTML = '<div class="px-4 py-10 text-center text-white/70">Something went wrong loading this page. Check your connection and try again.</div>';
   });
 }
