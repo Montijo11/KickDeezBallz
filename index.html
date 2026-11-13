@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>KickDeezBallz</title>
 <meta name="description" content="KickDeezBallz - next game, schedule and roster for our coed kickball team.">
-<link rel="icon" type="image/jpeg" href="KDZ.jpeg">
+<link rel="icon" type="image/png" href="icon-192.png">
 
 <!-- Social share preview (Facebook, Instagram, WhatsApp, iMessage, LinkedIn, Discord, Slack, X) -->
 <meta property="og:type" content="website">
@@ -29,9 +29,21 @@
 <meta name="twitter:image" content="https://kickdeezballz.com/KickDeezBallz_Logo.jpeg">
 <meta name="twitter:image:alt" content="KickDeezBallz logo">
 
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SportsTeam",
+  "name": "KickDeezBallz",
+  "sport": "Kickball",
+  "url": "https://kickdeezballz.com/",
+  "logo": "https://kickdeezballz.com/KickDeezBallz_Logo.jpeg",
+  "description": "KickDeezBallz is a coed kickball team. See the next game, schedule, standings and roster."
+}
+</script>
+
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"></script>
 <script src="config.js"></script>
 <script>
   tailwind.config = { theme: { extend: {
@@ -69,7 +81,7 @@
     box-shadow:0 0 22px rgba(228,68,12,.55); text-shadow:0 0 12px rgba(228,68,12,.8); white-space:nowrap; }
   .tile { background:#101C2E; border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:8px 0; text-align:center; }
   .tile b { display:block; font-family:'Bebas Neue',sans-serif; font-size:30px; line-height:1; color:#fff; }
-  .tile span { font-size:10px; letter-spacing:.12em; color:#9FB0C8; }
+  .tile span { font-size:12px; letter-spacing:.12em; color:#9FB0C8; }
   .card { background:#16253B; border:1px solid rgba(255,255,255,.08); border-radius:16px; }
   .card.mine { border-color:#E4440C; box-shadow:0 0 18px rgba(228,68,12,.35); }
 
@@ -79,7 +91,7 @@
   .ggrid.m { grid-template-columns:repeat(3,minmax(0,1fr)); }
   .ggrid.l { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
   .gitem.sel { outline:3px solid #E4440C; outline-offset:-3px; }
-  .gcheck { position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:9999px; background:#E4440C; color:#fff;
+  .gcheck { position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:9999px; background:#C93A08; color:#fff;
     font:800 13px/22px 'Inter',sans-serif; text-align:center; }
 
   /* ---------- Field ---------- */
@@ -100,11 +112,11 @@
   .pos.empty .dot { background:rgba(16,28,46,.45); border:2px dashed rgba(255,255,255,.6); box-shadow:none;
     color:rgba(255,255,255,.85); font-size:15px; letter-spacing:.04em; }
   .pos.empty:hover .dot { transform:none; }
-  .cnt { position:absolute; top:-7px; right:-7px; min-width:16px; height:16px; padding:0 3px; border-radius:9999px; background:#fff; color:#101C2E;
-    font:800 10px/16px 'Inter',sans-serif; text-align:center; }
+  .cnt { position:absolute; top:-8px; right:-8px; min-width:18px; height:18px; padding:0 3px; border-radius:9999px; background:#fff; color:#101C2E;
+    font:800 12px/18px 'Inter',sans-serif; text-align:center; }
   .star { position:absolute; top:-9px; left:-6px; font-size:13px; color:#FFD34D; text-shadow:0 0 4px #000; }
   .lbl { margin-top:2px; max-width:56px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-    font:700 10px/1.1 'Inter',sans-serif; color:#fff; text-shadow:0 1px 3px #000, 0 0 4px #000; }
+    font:700 12px/1.1 'Inter',sans-serif; color:#fff; text-shadow:0 1px 3px #000, 0 0 4px #000; }
   .pop { display:none; position:absolute; left:50%; bottom:100%; transform:translateX(-50%); padding-bottom:6px; }
   .pos.below .pop { bottom:auto; top:100%; padding-bottom:0; padding-top:6px; }
   .pos.l .pop { left:0; transform:none; }
@@ -115,14 +127,17 @@
   .pop li { display:flex; gap:8px; align-items:center; font-size:13px; padding:3px 0; border-top:1px solid rgba(255,255,255,.08); white-space:nowrap; }
   .pop li b { font-family:'Bebas Neue',sans-serif; font-size:18px; color:#E4440C; min-width:34px; }
 
-  /* ---------- Accessibility patch ---------- */
+  /* ---------- Accessibility and mobile patch ---------- */
   html .text-orange { color:#FF6A33; }
+  html .bg-orange { background-color:#C93A08; }
   .text-white\/40, .text-white\/50 { color:rgba(255,255,255,.7); }
-  .lbl, .tile span { font-size:12px; }
   header.fixed { padding-top:env(safe-area-inset-top); height:calc(4rem + env(safe-area-inset-top)) !important; }
-  main#app { padding-top:calc(4rem + env(safe-area-inset-top)) !important; }
+  main#app { padding-top:calc(4rem + env(safe-area-inset-top)) !important; outline:none; }
   #menuBtn, #closeBtn { min-width:48px; min-height:48px; }
+  main button:not(.gitem) { min-height:48px; }
+  #lbClose, #mlbClose, #mlbPrev, #mlbNext { min-width:48px; }
   summary { min-height:48px; display:flex; align-items:center; }
+  input, select, textarea { font-size:16px !important; }
   @media (prefers-reduced-motion: reduce) {
     .glow,.streak,.spark,.mainlogo,.neon::before,.vs,.spot,.rise { animation:none !important; }
     .rise { opacity:1; transform:none; }
@@ -132,19 +147,19 @@
 </head>
 <body>
 
-<a href="#app" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[80] focus:bg-orange focus:text-white focus:px-4 focus:py-2 focus:rounded-lg">Skip to content</a>
+<a href="#app" onclick="event.preventDefault();document.getElementById('app').focus();" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[80] focus:bg-orange focus:text-white focus:px-4 focus:py-2 focus:rounded-lg">Skip to content</a>
 
 <header class="fixed top-0 left-0 w-full h-16 bg-navy z-50 flex items-center justify-between px-4 border-b border-white/10">
   <a href="#/" class="flex items-center" aria-label="KickDeezBallz Home">
-    <img src="KDZ.jpeg" alt="KDZ logo" class="h-11 w-11 rounded-lg object-cover border border-orange/60" onerror="this.style.display='none'">
+    <img src="icon-192.png" width="44" height="44" decoding="async" alt="KDZ logo" class="h-11 w-11 rounded-lg object-cover border border-orange/60" onerror="this.style.display='none'">
   </a>
-  <button id="menuBtn" aria-label="Open menu" aria-expanded="false" class="p-2">
+  <button id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="drawer" class="p-2">
     <svg width="28" height="28" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M4 8h20M4 14h20M4 20h20"/></svg>
   </button>
 </header>
 
 <div id="overlay" class="fixed inset-0 bg-black/60 z-[55] hidden"></div>
-<nav id="drawer" class="fixed top-0 right-0 h-full w-72 bg-navy z-[60] translate-x-full transition-transform duration-300 border-l border-orange/40 p-6 overflow-y-auto">
+<nav id="drawer" inert aria-label="Main menu" class="fixed top-0 right-0 h-full w-72 bg-navy z-[60] translate-x-full transition-transform duration-300 border-l border-orange/40 p-6 overflow-y-auto">
   <button id="closeBtn" aria-label="Close menu" class="absolute top-4 right-4 text-3xl leading-none">&times;</button>
   <div class="font-display text-4xl mt-8 mb-8">KICK <span class="text-orange">DEEZ</span> BALLZ</div>
   <a href="#/" class="navlink block py-3 font-display text-3xl border-b border-white/10">Home</a>
@@ -152,17 +167,26 @@
   <a href="#/standings" class="navlink block py-3 font-display text-3xl border-b border-white/10">Standings</a>
   <a href="#/roster" class="navlink block py-3 font-display text-3xl text-orange border-b border-white/10">Roster</a>
   <a href="#/achievements" class="navlink block py-3 font-display text-3xl border-b border-white/10">Achievements</a>
-  <a href="#/gallery" class="navlink block py-3 font-display text-3xl text-orange border-b border-white/10">Gallery<span data-soon="gallery" class="ml-2 align-middle font-body text-[10px] font-bold tracking-widest text-orange border border-orange/60 rounded-full px-2 py-0.5">COMING SOON</span></a>
-  <a href="#/merch" class="navlink block py-3 font-display text-3xl border-b border-white/10">Merch<span data-soon="merch" class="ml-2 align-middle font-body text-[10px] font-bold tracking-widest text-orange border border-orange/60 rounded-full px-2 py-0.5">COMING SOON</span></a>
+  <a href="#/gallery" class="navlink block py-3 font-display text-3xl text-orange border-b border-white/10">Gallery<span data-soon="gallery" class="ml-2 align-middle font-body text-xs font-bold tracking-widest text-orange border border-orange/60 rounded-full px-2 py-0.5">COMING SOON</span></a>
+  <a href="#/merch" class="navlink block py-3 font-display text-3xl border-b border-white/10">Merch<span data-soon="merch" class="ml-2 align-middle font-body text-xs font-bold tracking-widest text-orange border border-orange/60 rounded-full px-2 py-0.5">COMING SOON</span></a>
 </nav>
 
-<main id="app" class="pt-16 min-h-screen"></main>
+<main id="app" tabindex="-1" class="pt-16 min-h-screen">
+  <noscript>
+    <div class="px-4 py-10 text-center">
+      <h1 class="font-display text-5xl">KickDeezBallz</h1>
+      <p class="mt-4 text-white/80">KickDeezBallz is a coed kickball team. Turn on JavaScript to see the next game, schedule, standings, roster, gallery and merch.</p>
+    </div>
+  </noscript>
+</main>
 <footer class="text-center text-xs text-white/40 py-8">&copy; KickDeezBallz.com</footer>
 
 <script>
 const db = supabase.createClient(KDB_CONFIG.SUPABASE_URL, KDB_CONFIG.SUPABASE_ANON_KEY);
 const app = document.getElementById('app');
 let timer = null;
+let merchCtl = null;
+try { sessionStorage.removeItem('kdz_pin'); } catch (e) {}
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const record = t => t ? `${t.wins}-${t.losses}${t.ties ? '-' + t.ties : ''}` : '0-0';
@@ -247,13 +271,40 @@ async function findActiveGame() {
 
 /* ---------- Drawer ---------- */
 const drawer = document.getElementById('drawer'), overlay = document.getElementById('overlay');
-const openMenu = () => { drawer.classList.remove('translate-x-full'); overlay.classList.remove('hidden'); document.getElementById('menuBtn').setAttribute('aria-expanded', 'true'); };
-const closeMenu = () => { drawer.classList.add('translate-x-full'); overlay.classList.add('hidden'); document.getElementById('menuBtn').setAttribute('aria-expanded', 'false'); };
-document.getElementById('menuBtn').onclick = openMenu;
-document.getElementById('closeBtn').onclick = closeMenu;
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+const menuBtn = document.getElementById('menuBtn'), closeBtn = document.getElementById('closeBtn');
+const openMenu = () => {
+  drawer.removeAttribute('inert');
+  drawer.classList.remove('translate-x-full');
+  overlay.classList.remove('hidden');
+  menuBtn.setAttribute('aria-expanded', 'true');
+  closeBtn.focus();
+};
+const closeMenu = () => {
+  if (drawer.hasAttribute('inert')) return;
+  drawer.setAttribute('inert', '');
+  drawer.classList.add('translate-x-full');
+  overlay.classList.add('hidden');
+  menuBtn.setAttribute('aria-expanded', 'false');
+  menuBtn.focus();
+};
+menuBtn.onclick = openMenu;
+closeBtn.onclick = closeMenu;
 overlay.onclick = closeMenu;
 document.querySelectorAll('.navlink').forEach(a => a.addEventListener('click', closeMenu));
+
+/* One global key handler: Escape closes the top-most popup, arrows drive the merch viewer */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    const um = document.getElementById('upModal');
+    if (um && !um.classList.contains('hidden')) { um.classList.add('hidden'); um.classList.remove('flex'); return; }
+    const lb = document.getElementById('lb');
+    if (lb && !lb.classList.contains('hidden')) { closeLightbox(); return; }
+    if (merchCtl && document.getElementById('mlb') && merchCtl.isOpen()) { merchCtl.close(); return; }
+    closeMenu();
+    return;
+  }
+  if (merchCtl && document.getElementById('mlb') && merchCtl.isOpen()) merchCtl.onKey(e);
+});
 
 /* ---------- Game-day lineup (field + inning switcher) ---------- */
 const LU_POS = ['P', 'C', '1B', '2B', '3B', 'SS', 'L', 'SL', 'LC', 'RC', 'SR', 'R'];
@@ -271,7 +322,7 @@ function lineupHTML(lu, season) {
   <div class="neon rise mt-5" style="animation-delay:.7s"><div class="in p-5">
     <div class="flex items-center justify-between mb-4">
       <span class="font-display text-2xl tracking-widest text-orange">LINEUP</span>
-      <span class="text-[11px] text-white/60 text-right">Season ${esc(season)}</span>
+      <span class="text-xs text-white/60 text-right">Season ${esc(season)}</span>
     </div>
     ${lu.title ? `<div class="text-center mb-4"><span class="round" style="font-size:30px;padding:6px 22px">${esc(lu.title)}</span></div>` : ''}
 
@@ -363,7 +414,7 @@ async function renderHome() {
     <div class="glow"></div>${streaks}${sparks}
     <div class="relative">
       <h1 class="sr-only">KickDeezBallz</h1>
-      <img src="KickDeezBallz_Logo_Transparent.png" alt="KickDeezBallz logo" class="mainlogo w-full max-w-md mx-auto" onerror="this.style.display='none'">
+      <img src="KickDeezBallz_Logo_Transparent.png" width="1536" height="1024" decoding="async" alt="KickDeezBallz logo" class="mainlogo w-full max-w-md mx-auto" onerror="this.style.display='none'">
     </div>
   </section>
   <section id="nextGame" class="px-4 -mt-6 pb-6 relative">
@@ -373,7 +424,7 @@ async function renderHome() {
   const { best, error } = await findActiveGame();
   const box = document.getElementById('nextGame');
   if (!box) return;
-  if (error) { box.innerHTML = `<div class="card p-5 text-center text-sm">Could not load the next game.<br><span class="text-white/50">${esc(error.message)}</span></div>`; return; }
+  if (error) { box.innerHTML = `<div class="card p-5 text-center text-sm">Could not load the next game.<br><span class="text-white/50">Please try again in a moment.</span></div>`; return; }
   if (!best) { box.innerHTML = `<div class="card p-6 text-center font-display text-2xl">No game scheduled yet</div>`; return; }
 
   const teams = await teamMapFor(best.season);
@@ -385,7 +436,7 @@ async function renderHome() {
   <div class="neon rise" style="animation-delay:.5s"><div class="in p-5">
     <div class="flex items-center justify-between mb-4">
       <span class="font-display text-2xl tracking-widest text-orange">${res ? 'FINAL SCORE' : 'NEXT GAME'}</span>
-      <span class="text-[11px] text-white/60 text-right">${esc(g.league_name)} &middot; Season ${best.season}</span>
+      <span class="text-xs text-white/60 text-right">${esc(g.league_name)} &middot; Season ${best.season}</span>
     </div>
     ${g.round_label ? `<div class="text-center mb-4"><span class="round">${esc(g.round_label)}</span></div>` : ''}
     <div class="flex items-start">
@@ -567,7 +618,7 @@ function fieldHTML(players) {
   }).join('');
 
   return `<div class="card p-3 mb-5"><div class="field">${fieldSVG()}${empties}${spots}</div>
-    <p class="text-center text-[11px] text-white/50 mt-2">Hover or tap a <span class="text-orange font-bold">&#9776;</span> spot to see everyone at that position. UT is the utility spot for players who can play multiple positions. Dashed circles are open positions.</p></div>`;
+    <p class="text-center text-xs text-white/50 mt-2">Hover or tap a <span class="text-orange font-bold">&#9776;</span> spot to see everyone at that position. UT is the utility spot for players who can play multiple positions. Dashed circles are open positions.</p></div>`;
 }
 
 async function renderRoster() {
@@ -575,7 +626,7 @@ async function renderRoster() {
   const { data, error } = await db.from('players').select('*');
   const list = document.getElementById('list');
   if (!list) return;
-  if (error) { list.textContent = 'Could not load roster: ' + error.message; return; }
+  if (error) { list.textContent = 'Could not load the roster. Please try again.'; return; }
   if (!data.length) { list.textContent = 'No players yet.'; return; }
   data.sort((a, b) =>
     (rosterRank(a) - rosterRank(b)) ||
@@ -604,7 +655,7 @@ async function renderRoster() {
       <div class="flex-1 min-w-0">
         <div class="font-display text-2xl leading-tight truncate">${esc(p.player_name)}</div>
         <div class="text-sm text-white/70">${esc(p.preferred_position)}</div>
-        ${p.status_tag ? `<span class="inline-block mt-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange/20 text-orange border border-orange/40">${esc(p.status_tag)}</span>` : ''}
+        ${p.status_tag ? `<span class="inline-block mt-1 text-xs font-bold px-2 py-0.5 rounded-full bg-orange/20 text-orange border border-orange/40">${esc(p.status_tag)}</span>` : ''}
       </div>
       <div class="font-display text-4xl text-orange">#${esc(p.jersey_number)}</div>
     </div>`).join('');
@@ -633,6 +684,7 @@ async function renderSchedule() {
 
   const list = document.getElementById('list');
   let season = await defaultSeason();
+  let reqId = 0;
 
   const drawChips = () => {
     const box = document.getElementById('chips');
@@ -642,6 +694,7 @@ async function renderSchedule() {
   };
 
   async function load(n) {
+    const my = ++reqId;
     season = n;
     sessionStorage.setItem('kdz_season', String(n));
     drawChips();
@@ -651,8 +704,8 @@ async function renderSchedule() {
       db.from(gamesT(n)).select('*').order('match_at', { ascending: false }),
       teamMapFor(n)
     ]);
-    if (!document.getElementById('list')) return;
-    if (g.error) { list.textContent = `Could not load Season ${n}: ` + g.error.message; return; }
+    if (!document.getElementById('list') || my !== reqId) return;
+    if (g.error) { list.textContent = `Could not load Season ${n}. Please try again.`; return; }
     const games = g.data || [];
     list.className = 'space-y-3';
     list.innerHTML = games.length ? games.map(game => {
@@ -708,6 +761,7 @@ async function renderStandings() {
 
   const list = document.getElementById('list');
   let season = await defaultSeason();
+  let reqId = 0;
 
   const drawChips = () => {
     const box = document.getElementById('chips');
@@ -717,14 +771,15 @@ async function renderStandings() {
   };
 
   async function load(n) {
+    const my = ++reqId;
     season = n;
     sessionStorage.setItem('kdz_season', String(n));
     drawChips();
     list.className = 'space-y-3 text-white/60';
     list.textContent = 'Loading...';
     const { data, error } = await db.from(teamsT(n)).select('*');
-    if (!document.getElementById('list')) return;
-    if (error) { list.textContent = `Could not load Season ${n}: ` + error.message; return; }
+    if (!document.getElementById('list') || my !== reqId) return;
+    if (error) { list.textContent = `Could not load Season ${n}. Please try again.`; return; }
     const teams = (data || []).slice().sort((a, b) =>
       (winPct(b) - winPct(a)) ||
       ((b.wins || 0) - (a.wins || 0)) ||
@@ -756,7 +811,7 @@ async function renderAchievements() {
   const list = document.getElementById('list');
   const { data, error } = await db.from('achievements').select('*');
   if (!document.getElementById('list')) return;
-  if (error) { list.textContent = 'Could not load achievements: ' + error.message; return; }
+  if (error) { list.textContent = 'Could not load achievements. Please try again.'; return; }
   const rows = (data || []).slice().sort((a, b) => {
     const da = a.earned_on ? new Date(a.earned_on).getTime() : -Infinity;
     const dbb = b.earned_on ? new Date(b.earned_on).getTime() : -Infinity;
@@ -792,7 +847,7 @@ function renderSoon(word, blurb) {
   <div class="px-4 py-6">
     <h2 class="font-display text-5xl mb-4">THE <span class="text-orange">${esc(word)}</span></h2>
     <div class="neon rise"><div class="in p-8 text-center">
-      <img src="KDZ.jpeg" alt="" class="h-20 w-20 rounded-2xl object-cover border-2 border-orange mx-auto mb-5" onerror="this.style.display='none'">
+      <img src="icon-192.png" width="80" height="80" decoding="async" alt="" class="h-20 w-20 rounded-2xl object-cover border-2 border-orange mx-auto mb-5" onerror="this.style.display='none'">
       <div class="round">COMING SOON</div>
       <p class="text-white/80 mt-5 leading-relaxed">${esc(blurb)}</p>
       <a href="#/" class="inline-block mt-6 border-2 border-white text-white font-display text-2xl px-8 py-3 rounded-xl active:scale-95 transition">Back Home</a>
@@ -803,7 +858,20 @@ function renderSoon(word, blurb) {
 const photoUrl = p => p ? db.storage.from('photos').getPublicUrl(p).data.publicUrl : '';
 const safeUrl = u => /^https:\/\//i.test(u || '') ? u : '';
 
+/* Upload limits (the edge function should enforce the same limits) */
 const MAX_VIDEO_MB = 50;
+const MAX_PHOTO_MB = 20;
+const OK_IMG = /^image\/(jpeg|png|gif|webp|heic|heif)$/i;
+const OK_VID = /^video\/(mp4|quicktime|webm)$/i;
+function checkFile(kind, f) {
+  if (kind === 'video') {
+    if (!OK_VID.test(f.type)) throw new Error('Video must be MP4, MOV or WebM.');
+    if (f.size > MAX_VIDEO_MB * 1048576) throw new Error(`Video is over ${MAX_VIDEO_MB} MB. Trim it or pick a shorter one.`);
+  } else {
+    if (!OK_IMG.test(f.type)) throw new Error('Photos must be JPG, PNG, GIF, WebP or HEIC.');
+    if (f.size > MAX_PHOTO_MB * 1048576) throw new Error(`Photo is over ${MAX_PHOTO_MB} MB.`);
+  }
+}
 
 async function prepPhoto(file) {
   if (/gif/i.test(file.type)) return { blob: file, ext: 'gif', type: file.type };
@@ -827,6 +895,7 @@ let gallerySize = localStorage.getItem('kdz_gsize') || 'm';
 let selectMode = false;
 const selected = new Set();
 let allAlbums = [];
+let teamPin = '';   // kept in memory only
 
 // Talk to the Supabase function (PIN-protected actions)
 async function adminCall(body) {
@@ -840,18 +909,20 @@ async function adminCall(body) {
 function pinModal(title, bodyHTML, okLabel, onOk, after) {
   const m = document.getElementById('upModal');
   m.innerHTML = `
-  <div class="card w-full max-w-sm p-5 max-h-[90vh] overflow-y-auto">
-    <div class="font-display text-3xl mb-3">${title}</div>
-    <label class="text-xs text-white/70">Team PIN</label>
-    <input id="pmPin" type="password" autocomplete="off" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20" value="${esc(sessionStorage.getItem('kdz_pin') || '')}">
+  <div id="pmCard" role="dialog" aria-modal="true" aria-labelledby="pmTitle" tabindex="-1" class="card w-full max-w-sm p-5 max-h-[90vh] overflow-y-auto">
+    <div id="pmTitle" class="font-display text-3xl mb-3">${title}</div>
+    <label for="pmPin" class="text-xs text-white/70">Team PIN</label>
+    <input id="pmPin" type="password" autocomplete="off" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20">
     ${bodyHTML}
-    <div id="pmMsg" class="text-sm min-h-[20px] mb-3"></div>
+    <div id="pmMsg" role="status" class="text-sm min-h-[20px] mb-3"></div>
     <div class="grid grid-cols-2 gap-3">
       <button id="pmCancel" class="border-2 border-white font-display text-xl py-2 rounded-xl">Cancel</button>
       <button id="pmOk" class="bg-orange font-display text-xl py-2 rounded-xl">${okLabel}</button>
     </div>
   </div>`;
+  document.getElementById('pmPin').value = teamPin;
   m.classList.remove('hidden'); m.classList.add('flex');
+  document.getElementById('pmCard').focus();
   const msg = t => { document.getElementById('pmMsg').textContent = t; };
   const close = () => { m.classList.add('hidden'); m.classList.remove('flex'); };
   document.getElementById('pmCancel').onclick = close;
@@ -862,7 +933,7 @@ function pinModal(title, bodyHTML, okLabel, onOk, after) {
     const btn = document.getElementById('pmOk'); btn.disabled = true; btn.classList.add('opacity-50');
     try {
       await onOk(pin);
-      sessionStorage.setItem('kdz_pin', pin);
+      teamPin = pin;
       close(); renderGallery();
     } catch (e) {
       msg(e.message || 'Something went wrong.');
@@ -873,13 +944,13 @@ function pinModal(title, bodyHTML, okLabel, onOk, after) {
 
 // Album dropdown (existing albums + "New album...") used by several popups
 function albumPickerHTML(albums, pre, noneLabel) {
-  return `<label class="text-xs text-white/70">Album</label>
+  return `<label for="pmAlbum" class="text-xs text-white/70">Album</label>
   <select id="pmAlbum" class="w-full mb-2 px-3 py-2 rounded-lg bg-navy border border-white/20">
     <option value="">${esc(noneLabel)}</option>
     ${albums.map(a => `<option value="${esc(a)}" ${a === pre ? 'selected' : ''}>${esc(a)}</option>`).join('')}
     <option value="__new__">+ New album...</option>
   </select>
-  <input id="pmNewAlbum" type="text" maxlength="40" placeholder="New album name" class="hidden w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20">`;
+  <input id="pmNewAlbum" type="text" maxlength="40" placeholder="New album name" aria-label="New album name" class="hidden w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20">`;
 }
 function wirePicker() {
   const sel = document.getElementById('pmAlbum'), nb = document.getElementById('pmNewAlbum');
@@ -898,7 +969,7 @@ function readPicker() {
 // ---- Gallery actions ----
 function newAlbumPopup() {
   pinModal('NEW <span class="text-orange">ALBUM</span>',
-    `<label class="text-xs text-white/70">Album name</label>
+    `<label for="pmName" class="text-xs text-white/70">Album name</label>
      <input id="pmName" type="text" maxlength="40" placeholder="Example: Game Day" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20">`,
     'Create',
     async pin => {
@@ -933,7 +1004,7 @@ function deletePopup(ids) {
 
 function editPopup(p) {
   pinModal('EDIT <span class="text-orange">ITEM</span>',
-    `<label class="text-xs text-white/70">Caption</label>
+    `<label for="pmCap" class="text-xs text-white/70">Caption</label>
      <input id="pmCap" type="text" maxlength="200" value="${esc(p.caption || '')}" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20">
      ${albumPickerHTML(allAlbums, p.album || '', 'No album (Unsorted)')}`,
     'Save',
@@ -948,7 +1019,7 @@ function editPopup(p) {
 
 function renameAlbumPopup(name) {
   pinModal('RENAME <span class="text-orange">ALBUM</span>',
-    `<label class="text-xs text-white/70">New name</label>
+    `<label for="pmName" class="text-xs text-white/70">New name</label>
      <input id="pmName" type="text" maxlength="40" value="${esc(name)}" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20">`,
     'Rename',
     async pin => {
@@ -977,6 +1048,7 @@ function closeLightbox() {
 }
 
 async function uploadOne(kind, file, pin, name, caption, album) {
+  checkFile(kind, file);
   let blob = file, ext = (file.name.split('.').pop() || '').toLowerCase(), type = file.type;
   if (kind === 'photo') ({ blob, ext, type } = await prepPhoto(file));
   const s = await adminCall({ action: 'sign', kind, pin, ext });
@@ -990,11 +1062,12 @@ async function openUpload(kind) {
   const pre = (galleryAlbum !== '__all__' && galleryAlbum !== '__none__') ? galleryAlbum : '';
   pinModal(`ADD <span class="text-orange">${isVid ? 'VIDEO' : 'PHOTOS'}</span>`,
     `${albumPickerHTML(allAlbums, pre, 'No album')}
-     <label class="text-xs text-white/70 mt-1 block">Your name (optional)</label>
+     <label for="upName" class="text-xs text-white/70 mt-1 block">Your name (optional)</label>
      <input id="upName" type="text" maxlength="60" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20" value="${esc(localStorage.getItem('kdz_name') || '')}">
-     <label class="text-xs text-white/70">Caption (optional)</label>
+     <label for="upCap" class="text-xs text-white/70">Caption (optional)</label>
      <input id="upCap" type="text" maxlength="200" class="w-full mb-3 px-3 py-2 rounded-lg bg-navy border border-white/20">
-     <input id="upFile" type="file" accept="${isVid ? 'video/*' : 'image/*'}" ${isVid ? '' : 'multiple'} class="w-full mb-3 text-sm">`,
+     <label for="upFile" class="text-xs text-white/70">${isVid ? 'Video file' : 'Photo files'}</label>
+     <input id="upFile" type="file" accept="${isVid ? 'video/mp4,video/quicktime,video/webm' : 'image/*'}" ${isVid ? '' : 'multiple'} class="w-full mb-3 text-sm">`,
     'Upload',
     async pin => {
       const album = readPicker();
@@ -1002,7 +1075,7 @@ async function openUpload(kind) {
       const cap = document.getElementById('upCap').value.trim();
       const files = Array.from(document.getElementById('upFile').files || []);
       if (!files.length) throw new Error('Choose a file first.');
-      if (isVid && files[0].size > MAX_VIDEO_MB * 1048576) throw new Error(`Video is over ${MAX_VIDEO_MB} MB. Trim it or pick a shorter one.`);
+      files.forEach(f => checkFile(kind, f));
       for (let i = 0; i < files.length; i++) {
         document.getElementById('pmMsg').textContent = `Uploading ${i + 1} of ${files.length}...`;
         await uploadOne(kind, files[i], pin, name, cap, album);
@@ -1034,7 +1107,7 @@ async function renderGallery() {
   </div>
   <div id="selBar" class="fixed bottom-0 left-0 right-0 z-[72] hidden items-center gap-2 bg-[#0B1422] border-t-2 border-orange p-3"></div>
   <div id="upModal" class="fixed inset-0 bg-black/80 z-[75] hidden items-center justify-center p-4"></div>
-  <div id="lb" class="fixed inset-0 bg-black/90 z-[70] hidden items-center justify-center p-4">
+  <div id="lb" role="dialog" aria-modal="true" aria-label="Photo viewer" class="fixed inset-0 bg-black/90 z-[70] hidden items-center justify-center p-4">
     <button id="lbClose" aria-label="Close" class="absolute top-4 right-5 text-4xl leading-none z-10">&times;</button>
     <figure class="max-w-full max-h-full text-center">
       <img id="lbImg" class="max-h-[70vh] max-w-full mx-auto rounded-lg hidden" alt="">
@@ -1056,7 +1129,7 @@ async function renderGallery() {
     db.from('gallery_albums').select('name')
   ]);
   if (!document.getElementById('list')) return;
-  if (pr.error) { list.textContent = 'Could not load photos: ' + pr.error.message; return; }
+  if (pr.error) { list.textContent = 'Could not load photos. Please try again.'; return; }
   const data = pr.data || [];
   allAlbums = [...new Set([...(ar.data || []).map(a => a.name), ...data.map(p => p.album)].filter(Boolean))]
     .sort((a, b) => a.localeCompare(b));
@@ -1100,7 +1173,7 @@ async function renderGallery() {
 
     // Size tabs: S / M / L
     const sizeBox = document.getElementById('sizeTabs');
-    sizeBox.innerHTML = '<span class="text-[11px] text-white/50 mr-1">Size</span>' +
+    sizeBox.innerHTML = '<span class="text-xs text-white/50 mr-1">Size</span>' +
       [['s', 'S'], ['m', 'M'], ['l', 'L']].map(([k, l]) => `<button data-z="${k}" class="${tabCls(k === gallerySize)}">${l}</button>`).join('');
     sizeBox.querySelectorAll('button').forEach(b => b.onclick = () => {
       gallerySize = b.dataset.z; localStorage.setItem('kdz_gsize', gallerySize); draw();
@@ -1152,7 +1225,7 @@ async function renderGallery() {
       const inner = p.media_type === 'video'
         ? `<video src="${url}#t=0.1" muted playsinline preload="metadata" class="w-full h-full object-cover pointer-events-none"></video>
            <span class="absolute inset-0 flex items-center justify-center ${playCls} text-white drop-shadow pointer-events-none">&#9654;</span>`
-        : `<img src="${url}" alt="${esc(p.caption || 'Team photo')}" loading="lazy" class="w-full h-full object-cover">`;
+        : `<img src="${url}" alt="${esc(p.caption || 'Team photo')}" loading="lazy" decoding="async" class="w-full h-full object-cover">`;
       return `<button data-i="${i}" class="gitem relative block overflow-hidden rounded-lg border border-white/10 bg-[#16253B] aspect-square ${on ? 'sel' : ''}">${inner}${on ? '<span class="gcheck">&#10003;</span>' : ''}</button>`;
     }).join('');
     list.querySelectorAll('button').forEach(b => b.onclick = () => {
@@ -1171,11 +1244,12 @@ async function renderGallery() {
       const url = photoUrl(p.image_path);
       img.classList.add('hidden'); vid.classList.add('hidden');
       if (p.media_type === 'video') { vid.src = url; vid.classList.remove('hidden'); }
-      else { img.src = url; img.classList.remove('hidden'); }
+      else { img.src = url; img.alt = p.caption || 'Team photo'; img.classList.remove('hidden'); }
       const by = p.uploaded_by ? ` (${p.uploaded_by})` : '';
       const al = p.album ? `[${p.album}] ` : '';
       document.getElementById('lbCap').textContent = al + (p.caption || '') + by;
       lb.classList.remove('hidden'); lb.classList.add('flex');
+      document.getElementById('lbClose').focus();
     });
   }
   draw();
@@ -1184,6 +1258,7 @@ async function renderGallery() {
 async function renderMerch() {
   const saved = localStorage.getItem('kdz_msize');
   let merchSize = ['s', 'm', 'l'].includes(saved) ? saved : 'm';
+  merchCtl = null;
 
   app.innerHTML = `
   <div class="px-4 py-6 pb-10">
@@ -1191,10 +1266,10 @@ async function renderMerch() {
     <div class="flex items-center justify-end gap-1 mb-4" id="mSizeTabs"></div>
     <div id="mlist" class="text-white/60">Loading...</div>
   </div>
-  <div id="mlb" class="fixed inset-0 bg-black/90 z-[70] hidden items-center justify-center p-4">
+  <div id="mlb" role="dialog" aria-modal="true" aria-label="Merch viewer" class="fixed inset-0 bg-black/90 z-[70] hidden items-center justify-center p-4">
     <button id="mlbClose" aria-label="Close" class="absolute top-4 right-5 text-4xl leading-none z-10">&times;</button>
-    <button id="mlbPrev" aria-label="Previous" class="absolute left-2 top-1/2 -translate-y-1/2 text-5xl px-2 z-10">&#8249;</button>
-    <button id="mlbNext" aria-label="Next" class="absolute right-2 top-1/2 -translate-y-1/2 text-5xl px-2 z-10">&#8250;</button>
+    <button id="mlbPrev" aria-label="Previous item" class="absolute left-2 top-1/2 -translate-y-1/2 text-5xl px-2 z-10">&#8249;</button>
+    <button id="mlbNext" aria-label="Next item" class="absolute right-2 top-1/2 -translate-y-1/2 text-5xl px-2 z-10">&#8250;</button>
     <figure class="max-w-full max-h-full text-center">
       <img id="mlbImg" class="max-h-[60vh] max-w-full mx-auto rounded-lg" alt="">
       <figcaption id="mlbCap" class="mt-3"></figcaption>
@@ -1205,7 +1280,7 @@ async function renderMerch() {
   const list = document.getElementById('mlist');
   const { data, error } = await db.from('merch_items').select('*').order('sort_order', { ascending: true });
   if (!document.getElementById('mlist')) return;
-  if (error) { list.textContent = 'Could not load merch: ' + error.message; return; }
+  if (error) { list.textContent = 'Could not load merch. Please try again.'; return; }
   const items = data || [];
   if (!items.length) { list.textContent = 'No merch yet.'; return; }
 
@@ -1213,10 +1288,15 @@ async function renderMerch() {
   const tabCls = on => `px-3 py-1 rounded-lg font-display text-lg ${on ? 'bg-orange' : 'bg-white/10'}`;
   const lb = document.getElementById('mlb'), lbImg = document.getElementById('mlbImg');
   const lbCap = document.getElementById('mlbCap'), lbBuy = document.getElementById('mlbBuy');
-  let cur = 0;
+  let cur = 0, opener = null;
 
-  const closeLb = () => { lb.classList.add('hidden'); lb.classList.remove('flex'); };
+  const isOpen = () => !lb.classList.contains('hidden');
+  const closeLb = () => {
+    lb.classList.add('hidden'); lb.classList.remove('flex');
+    if (opener && document.body.contains(opener)) opener.focus();
+  };
   const showItem = i => {
+    if (!isOpen()) opener = document.activeElement;
     cur = (i + items.length) % items.length;
     const it = items[cur];
     lbImg.src = photoUrl(it.image_path);
@@ -1227,6 +1307,16 @@ async function renderMerch() {
     lbBuy.classList.toggle('hidden', !href);
     if (href) lbBuy.href = href;
     lb.classList.remove('hidden'); lb.classList.add('flex');
+    document.getElementById('mlbClose').focus();
+  };
+
+  merchCtl = {
+    isOpen,
+    close: closeLb,
+    onKey: e => {
+      if (e.key === 'ArrowLeft') showItem(cur - 1);
+      if (e.key === 'ArrowRight') showItem(cur + 1);
+    }
   };
 
   lb.onclick = e => { if (e.target === lb) closeLb(); };
@@ -1245,7 +1335,7 @@ async function renderMerch() {
   function draw() {
     const box = document.getElementById('mSizeTabs');
     if (!box) return;
-    box.innerHTML = '<span class="text-[11px] text-white/50 mr-1">Size</span>' +
+    box.innerHTML = '<span class="text-xs text-white/50 mr-1">Size</span>' +
       [['s', 'S'], ['m', 'M'], ['l', 'L']].map(([k, l]) => `<button data-z="${k}" class="${tabCls(k === merchSize)}">${l}</button>`).join('');
     box.querySelectorAll('button').forEach(b => b.onclick = () => {
       merchSize = b.dataset.z; localStorage.setItem('kdz_msize', merchSize); draw();
@@ -1255,40 +1345,5 @@ async function renderMerch() {
     const priceCls = merchSize === 's' ? 'text-sm' : 'text-xl';
     list.innerHTML = items.map((it, i) => `
       <button data-i="${i}" class="gitem relative block overflow-hidden rounded-lg border border-white/10 bg-[#16253B] aspect-square" aria-label="${esc(it.name)}">
-        <img src="${esc(photoUrl(it.image_path))}" alt="${esc(it.name)}" loading="lazy" class="w-full h-full object-cover">
-        <span class="absolute bottom-1 left-1 bg-navy/85 border border-orange rounded-full px-2 py-0.5 font-display ${priceCls} leading-none">${money(it.price)}</span>
-      </button>`).join('');
-    list.querySelectorAll('button').forEach(b => b.onclick = () => showItem(Number(b.dataset.i)));
-  }
-  draw();
-
-  document.addEventListener('keydown', function k(e) {
-    if (!document.getElementById('mlb')) return document.removeEventListener('keydown', k);
-    if (lb.classList.contains('hidden')) return;
-    if (e.key === 'Escape') closeLb();
-    if (e.key === 'ArrowLeft') showItem(cur - 1);
-    if (e.key === 'ArrowRight') showItem(cur + 1);
-  });
-}
-
-/* ---------- Router ---------- */
-function route() {
-  clearInterval(timer);
-  window.scrollTo(0, 0);
-  const h = location.hash || '#/';
-  const pages = {
-    '#/roster': [renderRoster, 'Roster'], '#/schedule': [renderSchedule, 'Schedule'],
-    '#/standings': [renderStandings, 'Standings'], '#/achievements': [renderAchievements, 'Achievements'],
-    '#/gallery': [renderGallery, 'Gallery'], '#/merch': [renderMerch, 'Merch']
-  };
-  const [fn, name] = pages[h] || [renderHome, ''];
-  document.title = name ? `${name} | KickDeezBallz` : 'KickDeezBallz';
-  Promise.resolve(fn()).catch(() => {
-    app.innerHTML = '<div class="px-4 py-10 text-center text-white/70">Something went wrong loading this page. Check your connection and try again.</div>';
-  });
-}
-window.addEventListener('hashchange', route);
-route();
-</script>
-</body>
-</html>
+        <img src="${esc(photoUrl(it.image_path))}" alt="${esc(it.name)}" loading="lazy" decoding="async" class="w-full h-full object-cover">
+        <span class="absolute bottom-1 left-1 bg-navy/85 border border-orange rounded-full px-2 py-0.5 font-display ${priceC
