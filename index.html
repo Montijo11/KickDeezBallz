@@ -1346,4 +1346,31 @@ async function renderMerch() {
     list.innerHTML = items.map((it, i) => `
       <button data-i="${i}" class="gitem relative block overflow-hidden rounded-lg border border-white/10 bg-[#16253B] aspect-square" aria-label="${esc(it.name)}">
         <img src="${esc(photoUrl(it.image_path))}" alt="${esc(it.name)}" loading="lazy" decoding="async" class="w-full h-full object-cover">
-        <span class="absolute bottom-1 left-1 bg-navy/85 border border-orange rounded-full px-2 py-0.5 font-display ${priceC
+        <span class="absolute bottom-1 left-1 bg-navy/85 border border-orange rounded-full px-2 py-0.5 font-display ${priceCls} leading-none">${money(it.price)}</span>
+      </button>`).join('');
+    list.querySelectorAll('button').forEach(b => b.onclick = () => showItem(Number(b.dataset.i)));
+  }
+  draw();
+}
+
+/* ---------- Router ---------- */
+function route() {
+  clearInterval(timer);
+  window.scrollTo(0, 0);
+  const h = location.hash || '#/';
+  const pages = {
+    '#/roster': [renderRoster, 'Roster'], '#/schedule': [renderSchedule, 'Schedule'],
+    '#/standings': [renderStandings, 'Standings'], '#/achievements': [renderAchievements, 'Achievements'],
+    '#/gallery': [renderGallery, 'Gallery'], '#/merch': [renderMerch, 'Merch']
+  };
+  const [fn, name] = pages[h] || [renderHome, ''];
+  document.title = name ? `${name} | KickDeezBallz` : 'KickDeezBallz';
+  Promise.resolve(fn()).catch(() => {
+    app.innerHTML = '<div class="px-4 py-10 text-center text-white/70">Something went wrong loading this page. Check your connection and try again.</div>';
+  });
+}
+window.addEventListener('hashchange', route);
+route();
+</script>
+</body>
+</html>
