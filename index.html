@@ -537,9 +537,12 @@ function parsePositions(raw) {
   return out;
 }
 
+// Uses the clean positions list from the database; falls back to parsing the text
+const posList = p => (Array.isArray(p.positions) && p.positions.length) ? p.positions : parsePositions(p.preferred_position);
+
 function rosterRank(p) {
   if (String(p.status_tag || '').trim().toLowerCase() === 'captain') return 0;
-  const first = parsePositions(p.preferred_position)[0];
+  const first = posList(p)[0];
   const i = POSITION_ORDER.indexOf(first);
   return i === -1 ? 100 : 1 + i;
 }
@@ -577,7 +580,7 @@ function fieldSVG() {
 function fieldHTML(players) {
   const groups = {};
   players.forEach(p => {
-    parsePositions(p.preferred_position).forEach(k => (groups[k] = groups[k] || []).push(p));
+    posList(p).forEach(k => (groups[k] = groups[k] || []).push(p));
   });
 
   // Empty positions: dashed circle with the position code
@@ -607,7 +610,7 @@ function fieldHTML(players) {
     } else {
       const p = list[0];
       const first = String(p.player_name || '').trim().split(/\s+/)[0];
-      inner = `<div class="spot" style="--d:${d}s" title="${esc(p.player_name)} (${esc(parsePositions(p.preferred_position).join(', '))})">
+      inner = `<div class="spot" style="--d:${d}s" title="${esc(p.player_name)} (${esc(posList(p).join(', '))})">
         <div class="dot">${cap}${esc(p.jersey_number)}</div>
         <div class="lbl">${esc(first)}</div>
       </div>`;
@@ -652,7 +655,7 @@ async function renderRoster() {
       </div>
       <div class="flex-1 min-w-0">
         <div class="font-display text-2xl leading-tight truncate">${esc(p.player_name)}</div>
-        <div class="text-sm text-white/70">${esc(p.preferred_position)}</div>
+        <div class="text-sm text-white/70">${esc(posList(p).join(', '))}</div>
         ${p.status_tag ? `<span class="inline-block mt-1 text-xs font-bold px-2 py-0.5 rounded-full bg-orange/20 text-orange border border-orange/40">${esc(p.status_tag)}</span>` : ''}
       </div>
       <div class="font-display text-4xl text-orange">#${esc(p.jersey_number)}</div>
